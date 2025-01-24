@@ -1,0 +1,4 @@
+/client/build/*
+arduino_secrets.h
+/debug/*
+/broker-arduino/.vscode/*
