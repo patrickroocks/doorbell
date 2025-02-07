@@ -2,3 +2,4 @@
 arduino_secrets.h
 /debug/*
 /broker-arduino/.vscode/*
+/project-doc/

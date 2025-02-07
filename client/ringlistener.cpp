@@ -139,8 +139,8 @@ void RingListener::mqttConnect()
 void RingListener::onMqttConnected()
 {
 	qDebug() << "Connected to MQTT broker!";
-	tray.sysTray.setIcon(tray.iconDefault);
 	mqttConnected = true;
+	updateIcon();
 
 	auto subscriptions = {RingTopic, ResponseTopic};
 
@@ -157,9 +157,9 @@ void RingListener::onMqttConnected()
 
 void RingListener::onMqttDisconnected()
 {
-	tray.sysTray.setIcon(tray.iconOff);
 	qDebug() << "Disconnected from MQTT broker. Next reconnect in" << ReconnectDelay << "ms";
 	mqttConnected = false;
+	updateIcon();
 	reconnectTimer.start(ReconnectDelay);
 }
 
@@ -181,4 +181,5 @@ void RingListener::dialogClosed()
 		qDebug() << "MQTT not connected!";
 	}
 	dialogOpen = false;
+	updateIcon();
 }
