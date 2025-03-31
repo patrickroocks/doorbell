@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>604</width>
-    <height>275</height>
+    <width>749</width>
+    <height>332</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -16,11 +16,11 @@
   <property name="styleSheet">
    <string notr="true">background-color:rgb(143, 240, 164)</string>
   </property>
-  <widget class="QPushButton" name="cmdOpenDoor">
+  <widget class="QPushButton" name="cmdOkOrOpen">
    <property name="geometry">
     <rect>
-     <x>380</x>
-     <y>210</y>
+     <x>540</x>
+     <y>270</y>
      <width>201</width>
      <height>51</height>
     </rect>
@@ -61,6 +61,22 @@
    </property>
    <property name="text">
     <string>Door bell rings!</string>
+   </property>
+  </widget>
+  <widget class="QTextEdit" name="txtAdditionalInfos">
+   <property name="geometry">
+    <rect>
+     <x>200</x>
+     <y>60</y>
+     <width>541</width>
+     <height>201</height>
+    </rect>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">background-color: rgb(143, 240, 164); border: 1px solid green;</string>
+   </property>
+   <property name="textInteractionFlags">
+    <set>Qt::TextInteractionFlag::NoTextInteraction</set>
    </property>
   </widget>
  </widget>

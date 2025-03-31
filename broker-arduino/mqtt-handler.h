@@ -11,7 +11,7 @@
 
 using namespace mqttBrokerName;
 
-#define WIFI_TIMEOUT_CYCLES 20 // 10sec, as a startup cycle is 500ms
+#define WIFI_TIMEOUT_CYCLES 10 // 5sec, as a startup cycle is 500ms
 
 // =============================================
 //              STATE
@@ -19,10 +19,10 @@ using namespace mqttBrokerName;
 
 bool mqttConnected = false;
 
-std::deque<String> ringArchive;
-#define MAX_RING_ARCHIVE 20
+std::deque<String> actionLog;
+#define MAX_ACTION_LOG_SIZE 50
 
-String startUpTime;
+String startTime;
 
 // =============================================
 //              TIME
@@ -52,22 +52,25 @@ const char* responseTopic = "response";
 const char* cmdBuzz = "buzz";
 const char* cmdAutoBuzzOn = "autoBuzzOn";
 const char* cmdAutoBuzzOff = "autoBuzzOff";
-const char* cmdShowRingArchive = "showRingArchive";
+const char* cmdGetActionLog = "getActionLog";
 const char* cmdGetAutoBuzz = "getAutoBuzz";
-const char* cmdGetStartUpTime = "getStartUpTime";
-const char* cmdTestExtRing = "test_ext_ring";
+const char* cmdGetStartTime = "getStartTime";
+const char* cmdTestRing = "testRing";
 const char* cmdPing = "ping";
 const char* cmdAckRing = "ackRing";
 const char* cmdRawData = "getRawData";
 
 // Messages
 const char* msgRing = "ring";
+const char* msgAckRing = "ackRing";
 const char* msgTestRing = "testRing";
 const char* msgAutoBuzzOn = "autoBuzzOn";
 const char* msgAutoBuzzOff = "autoBuzzOff";
 const char* msgPong = "pong";
 const char* msgBuzzAck = "buzzAck";
+const char* msgEndMultiResponse = "endMultiResponse";
 
+// Mqtt Broker is locally on the Arduino
 const char* mqttServerAddr = "localhost";
 
 // =============================================
@@ -78,6 +81,7 @@ const char* mqttServerAddr = "localhost";
 
 // *** Connections/Servers
 
+std::vector<WifiConfig> wifiConfigs;
 MqttBroker broker(MQTT_BROKER_PORT);
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -86,39 +90,59 @@ PubSubClient client(espClient);
 //              EVENTS
 // =============================================
 
+void addToActionLog(const String& action)
+{
+    actionLog.push_back(getDateTime() + " " + action);
+    if (actionLog.size() > MAX_ACTION_LOG_SIZE) {
+        actionLog.pop_front();
+    }
+}
+
 void writeRingToMqtt(bool testRing)
 {
     if (!wifiConnected) return;
 
-    Serial.println((testRing ? String() : "test ") + "ring detected at " + getDateTime());
+    const String ringStr = testRing ? msgTestRing : msgRing;
 
-    ringArchive.push_back(getDateTime() + (testRing ? " (t)" : String()));
-
-    if (ringArchive.size() > MAX_RING_ARCHIVE) {
-        ringArchive.pop_front();
-    }
+    Serial.println(ringStr + " detected");
+    addToActionLog(ringStr);
 
     if (client.connected()) {
-        client.publish(ringTopic, testRing ? msgTestRing : msgRing);
+        String pubString = ringStr + " ";
+        if (autoBuzz && !testRing)
+            pubString += "auto buzz, ";
+        pubString += getDateTime();
+        client.publish(ringTopic, pubString.c_str());
     } else {
         Serial.println("MQTT not connected, cannot publish ring event");
-    }
-}
-
-void internalRing()
-{
-    timerExtBell.start();
-    timerBellBlink.start();
-
-    if (autoBuzz) {
-        eventBuzz();
     }
 }
 
 void ringAndWriteToMqtt(bool testRing)
 {
     writeRingToMqtt(testRing);
-    internalRing();
+
+    timerExtBell.start();
+    timerBellBlink.start();
+
+    if (autoBuzz && !testRing) {
+        eventBuzz(true);
+    }
+}
+
+void buzzAndWriteToLog(bool autoBuzz)
+{
+    timerDoorBuzzer.start();
+    addToActionLog(String{"buzz "} + (autoBuzz ? " (auto)" : "(manual)"));
+}
+
+void ackRingAndWriteToMqtt()
+{
+    timerBellBlink.stop();
+
+    if (client.connected()) {
+        client.publish(ringTopic, msgAckRing);
+    }
 }
 
 void sendAutoBuzzState(bool newAutoBuzzState)
@@ -126,17 +150,22 @@ void sendAutoBuzzState(bool newAutoBuzzState)
     client.publish(ringTopic, newAutoBuzzState ? msgAutoBuzzOn : msgAutoBuzzOff);
 }
 
-void showArchive()
+void showActionLog()
 {
-    String archive = "";
-    for (auto& ring : ringArchive) {
-        archive += ring;
-        if (&ring != &ringArchive.back()) {
-            archive += ", ";
-        }
+    for (const auto& entry : actionLog) {
+        client.publish(responseTopic, entry.c_str());
     }
 
-    client.publish(responseTopic, archive.c_str());
+    client.publish(responseTopic, msgEndMultiResponse);
+}
+
+void showRawData()
+{
+    for (const String& str : inputRing.getRawDataStrings()) {
+        client.publish(responseTopic, str.c_str());
+    }
+
+    client.publish(responseTopic, msgEndMultiResponse);
 }
 
 // =============================================
@@ -152,28 +181,26 @@ void callbackMqtt(char* topic, byte* payload, unsigned int length)
         }
 
         if (payloadStr == cmdBuzz) {
-            eventBuzz();
+            eventBuzz(false);
             client.publish(responseTopic, msgBuzzAck);
         } else if (payloadStr == cmdAutoBuzzOn) {
             setAutoBuzz(true);
         } else if (payloadStr == cmdAutoBuzzOff) {
             setAutoBuzz(false);
-        } else if (payloadStr == cmdTestExtRing) {
+        } else if (payloadStr == cmdTestRing) {
             ringAndWriteToMqtt(true);
-        } else if (payloadStr == cmdShowRingArchive) {
-            showArchive();
+        } else if (payloadStr == cmdGetActionLog) {
+            showActionLog();
         } else if (payloadStr == cmdPing) {
             client.publish(responseTopic, msgPong);
         } else if (payloadStr == cmdGetAutoBuzz) {
-            client.publish(responseTopic, autoBuzz ? "on" : "off");
+            client.publish(responseTopic, autoBuzz ? msgAutoBuzzOn : msgAutoBuzzOff);
         } else if (payloadStr == cmdAckRing) {
             timerBellBlink.stop();
         } else if (payloadStr == cmdRawData) {
-            for (const String& str : inputRing.getRawDataStrings()) {
-                client.publish(responseTopic, str.c_str());
-            }
-        } else if (payloadStr == cmdGetStartUpTime) {
-            client.publish(responseTopic, startUpTime.c_str());
+            showRawData();
+        } else if (payloadStr == cmdGetStartTime) {
+            client.publish(responseTopic, startTime.c_str());
         } else {
             Serial.print("[MQTT] received unknown command: ");
             Serial.println(payloadStr);
@@ -189,24 +216,20 @@ void callbackMqtt(char* topic, byte* payload, unsigned int length)
 //              SETUP
 // =============================================
 
-void setupWifi()
+void setupWifiConn(const WifiConfig& wifiConfig)
 {
-    // from the ardunio_secrets.h (SSID/password)
-    const char* ssid = SECRET_SSID;
-    const char* password = SECRET_PASS;
-
-    WiFi.begin(ssid, password);
-    Serial.println("Connecting to WiFi ");
+    WiFi.begin(wifiConfig.ssid.c_str(), wifiConfig.password.c_str());
+    Serial.println("Connecting to WiFi '" + wifiConfig.ssid + "'");
     int numCycles = 0;
     while (WiFi.status() != WL_CONNECTED) {
         waitCycle();
         Serial.print(".");
         if (++numCycles > WIFI_TIMEOUT_CYCLES) {
-            Serial.println("WiFi connection timeout");
+            Serial.println("WiFi connection timeout for '" + wifiConfig.ssid + "'");
             return;
         }
     }
-    Serial.println("WiFi connected. IP: ");
+    Serial.println("WiFi '" + wifiConfig.ssid + "' connected. IP: ");
     Serial.println(WiFi.localIP());
     wifiConnected = true;
 }
@@ -217,6 +240,23 @@ void setupNTP()
     ntp.ruleDST("CEST", Last, Sun, Mar, 2, 120);
     ntp.ruleSTD("CET", Last, Sun, Oct, 3, 60);
     ntp.begin();
+}
+
+void setupWifi()
+{
+    wifiConnected = false;
+    startupCycleCompleted = false;
+
+    for (const auto& wifiConfig : wifiConfigs) {
+        setupWifiConn(wifiConfig);
+        if (wifiConnected) {
+            break;
+        }
+    }
+
+    if (wifiConnected) {
+        setupNTP();
+    }
 }
 
 void setupMqttBroker()
@@ -239,11 +279,17 @@ void setupMqttClient()
 
 void setupWifiAndMqtt()
 {
+    // Connection to state-and-gpio-handler
     setRingCommand(ringAndWriteToMqtt);
     setAutoBuzzChangeCommand(sendAutoBuzzState);
+    setBuzzCommand(buzzAndWriteToLog);
+    setAckRingCommand(ackRingAndWriteToMqtt);
+    setTimeStrGetter(getDateTime);
+
+    // from arduiono_secrets.h
+    wifiConfigs = getWifiConfigs();
 
     setupWifi();
-    setupNTP();
     setupMqttBroker();
     setupMqttClient();
 }
@@ -272,14 +318,20 @@ void reconnectMqttClient()
 
 void loopClients()
 {
-    // Loop MQTT
+    // Reconnect wifi
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("[WIFI] disconnected, reconnecting...");
+        setupWifi();
+    }
+
+    // Reconnect/Loop MQTT
     if (!client.connected()) {
         reconnectMqttClient();
     }
     client.loop();
 
-    if (startUpTime.length() == 0) {
-        startUpTime = getDateTime();
+    if (startTime.length() == 0) {
+        startTime = getDateTime();
     }
 
     // LOOP NTP

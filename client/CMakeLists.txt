@@ -12,7 +12,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(Qt6 REQUIRED COMPONENTS Core Widgets Mqtt)
 
 set(PROJECT_SOURCES
-        main.cpp
+		main.cpp
 )
 
 add_executable(doorbell-client
@@ -22,25 +22,32 @@ add_executable(doorbell-client
 	resources.qrc
 	readme.md
 	constants.h
+	configstore.h configstore.cpp
+	ringapp.h ringapp.cpp
+	configdiagnosticsdialog.h configdiagnosticsdialog.cpp configdiagnosticsdialog.ui
+	command.h command.cpp
+	util.h util.cpp
+	commandclient.h commandclient.cpp
+
 )
 
 target_link_libraries(doorbell-client PRIVATE Qt6::Widgets Qt6::Mqtt)
 
 set_target_properties(doorbell-client PROPERTIES
-    ${BUNDLE_ID_OPTION}
-    MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
-    MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
-    MACOSX_BUNDLE TRUE
-    WIN32_EXECUTABLE TRUE
+	${BUNDLE_ID_OPTION}
+	MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
+	MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+	MACOSX_BUNDLE TRUE
+	WIN32_EXECUTABLE TRUE
 )
 
 include(GNUInstallDirs)
 install(TARGETS doorbell-client
-    BUNDLE DESTINATION .
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+	BUNDLE DESTINATION .
+	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
 if(QT_VERSION_MAJOR EQUAL 6)
-    qt_finalize_executable(doorbell-client)
+	qt_finalize_executable(doorbell-client)
 endif()

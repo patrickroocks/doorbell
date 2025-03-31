@@ -1,16 +1,17 @@
 #include "ringdialog.h"
 #include "ui_ringdialog.h"
 
+#include "command.h"
+#include "constants.h"
+
 #include <QCloseEvent>
 #include <QPixmap>
 #include <QProcess>
 #include <QScreen>
 #include <QShowEvent>
 
-#include "constants.h"
-
-RingDialog::RingDialog(QWidget * parent)
-	: QDialog(parent)
+RingDialog::RingDialog(RingListener* ringListener)
+	: CommandClientDialog(ringListener)
 	, ui(new Ui::RingDialog)
 	, wavPlayProcess(this)
 {
@@ -20,6 +21,9 @@ RingDialog::RingDialog(QWidget * parent)
 	// If this does not work, disable wayland! (cf. placeTopMid())
 	setWindowFlags(windowFlags() | Qt::WindowStaysOnTopHint);
 
+	// Do not allow to resize the dialog:
+	this->setFixedSize(this->size());
+
 	// Setup bell image
 	QPixmap pixmap(":/img/bell.png");
 	ui->lblBell->setPixmap(pixmap);
@@ -28,22 +32,41 @@ RingDialog::RingDialog(QWidget * parent)
 
 	// Setup connections
 	connect(&wavPlayTimer, &QTimer::timeout, this, &RingDialog::playWav);
-	connect(ui->cmdOpenDoor, &QPushButton::clicked, this, &RingDialog::doorBuzzerButtonClick);
+	connect(ui->cmdOkOrOpen, &QPushButton::clicked, this, &RingDialog::okOrOpen);
 }
 
-void RingDialog::incrementRingCount(bool testRing)
+void RingDialog::incrementRingCount(bool testRing, const QByteArray& additionalInfo, bool autoBuzzOn)
 {
 	if (testRing) testRingCount++;
 	else ringCount++;
 
-	if (!wavPlayTimer.isActive() && ringCount > 0) {
+	if (!testRing && !autoBuzzOn)
+	{
+		canOpen = true;
+		ui->cmdOkOrOpen->setText("Open house door");
+	}
+	else
+	{
+		ui->cmdOkOrOpen->setText("Ok");
+	}
+
+	if (!additionalInfos.isEmpty())
+		additionalInfos.append('\n');
+	additionalInfos += additionalInfo;
+	ui->txtAdditionalInfos->setPlainText(additionalInfos);
+
+	const int totalRingCount = ringCount + testRingCount;
+	if (!wavPlayTimer.isActive() && totalRingCount > 0)
+	{
 		playWav();
 		wavPlayTimer.start(WavPlayIntervalMs);
 	}
 
 	if (testRingCount == 0) {
-		if (ringCount == 1) ui->lblMessage->setText("Door ring detected!");
-		else ui->lblMessage->setText(QString("Door rings detected (total: %1)").arg(ringCount));
+		if (ringCount == 1)
+			ui->lblMessage->setText("Door ring detected!");
+		else
+			ui->lblMessage->setText(QString("Door rings detected (total: %1)").arg(ringCount));
 	} else {
 		ui->lblMessage->setText(QString("Door rings detected (normal: %1, test: %2)").arg(ringCount).arg(testRingCount));
 	}
@@ -59,38 +82,38 @@ void RingDialog::closeEvent(QCloseEvent * event)
 
 void RingDialog::closeDialog()
 {
+	sendCommand(Command::ackRing);
 	testRingCount = 0;
 	ringCount = 0;
+	canOpen = false;
+	additionalInfos.clear();
 	wavPlayTimer.stop();
 
 	this->hide();
-
 	emit dialogClosed();
 }
 
 void RingDialog::playWav() { wavPlayProcess.start("aplay", {TmpAlarmFile}); }
 
-void RingDialog::doorBuzzerButtonClick()
+void RingDialog::okOrOpen()
 {
-	ui->lblMessage->setText(QString("Waiting for door buzzer..."));
-	emit doorBuzzer();
+	if (canOpen)
+	{
+		ui->lblMessage->setText(QString("Waiting for door buzzer..."));
+		waitForBuzzerAck = true;
+		sendCommand(Command::buzz);
+	}
+	else
+	{
+		closeDialog();
+	}
 }
 
 RingDialog::~RingDialog() { delete ui; }
 
 void RingDialog::placeTopRight()
 {
-	/* If placement of the window and keeping it in foreground does not work, disable wayland!
-	
-	* Set "WaylandEnable=false" in GNOME config:
-		 sudo nano /etc/gdm3/custom.conf
-		```
-		[daemon]
-		WaylandEnable=false
-		```
-	* reboot system
-	*/
-
+	// Disable Wayland, cf. readme.md
 	QScreen * screen = QGuiApplication::primaryScreen();
 	QRect screenGeometry = screen->geometry();
 	int x = screenGeometry.topRight().x() - this->width();
@@ -99,3 +122,12 @@ void RingDialog::placeTopRight()
 }
 
 void RingDialog::showEvent(QShowEvent * event) { placeTopRight(); }
+
+void RingDialog::onReceiveCommandResponse(const Command& cmd, const QByteArray& response)
+{
+	if (cmd == Command::buzz && response == SpecialResponse::BuzzAck)
+	{
+		waitForBuzzerAck = false;
+		closeDialog();
+	}
+}

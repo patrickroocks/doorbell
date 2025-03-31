@@ -27,8 +27,8 @@
 #define LAST_LED  LED_DOORBELL
 
 #define SWITCH_BUZZMODE 7
-#define SWITCH_TESTBUZZ 8
-#define SWITCH_TESTRING 9
+#define SWITCH_ACK_BUZZ 8
+#define SWITCH_ACK      9
 
 #define INP_RING       10
 #define RELAY_BUZZER   11
@@ -38,8 +38,8 @@
 #define INPUT_DEBOUNCE_CYCLES  5
 
 DebouncedSwitch switchBuzzMode(SWITCH_BUZZMODE, SWITCH_DEBOUNCE_CYCLES);
-DebouncedSwitch switchTestBuzz(SWITCH_TESTBUZZ, SWITCH_DEBOUNCE_CYCLES);
-DebouncedSwitch switchTestRing(SWITCH_TESTRING, SWITCH_DEBOUNCE_CYCLES);
+DebouncedSwitch switchAckBuzz(SWITCH_ACK_BUZZ, SWITCH_DEBOUNCE_CYCLES);
+DebouncedSwitch switchAck(SWITCH_ACK, SWITCH_DEBOUNCE_CYCLES);
 DebouncedSwitch inputRing(INP_RING, INPUT_DEBOUNCE_CYCLES, true);
 
 // =============================================
@@ -66,6 +66,8 @@ bool startupCycleCompleted = false;
 
 void (*callbackRing)(bool) = nullptr;
 void (*callbackAutoBuzzChange)(bool) = nullptr;
+void (*callbackBuzz)(bool) = nullptr;
+void (*callbackAckRing)() = nullptr;
 
 void setRingCommand(void (*callback)(bool))
 {
@@ -75,6 +77,16 @@ void setRingCommand(void (*callback)(bool))
 void setAutoBuzzChangeCommand(void (*callback)(bool))
 {
     callbackAutoBuzzChange = callback;
+}
+
+void setBuzzCommand(void (*callback)(bool))
+{
+    callbackBuzz = callback;
+}
+
+void setAckRingCommand(void (*callback)())
+{
+    callbackAckRing = callback;
 }
 
 // =============================================
@@ -93,8 +105,8 @@ void setupLeds()
     // Switches (input)
     // Use PULLUPS, all switches are grounded
     pinMode(SWITCH_BUZZMODE, INPUT_PULLUP);
-    pinMode(SWITCH_TESTBUZZ, INPUT_PULLUP);
-    pinMode(SWITCH_TESTRING, INPUT_PULLUP);
+    pinMode(SWITCH_ACK_BUZZ, INPUT_PULLUP);
+    pinMode(SWITCH_ACK, INPUT_PULLUP);
 
     // ring input (also grounded, has its own pull up)
     pinMode(INP_RING, INPUT);
@@ -111,9 +123,18 @@ void setupLeds()
 //              EVENTS
 // =============================================
 
-void eventBuzz()
+void eventBuzz(bool autoBuzz)
 {
-    timerDoorBuzzer.start();
+    if (callbackBuzz) {
+        callbackBuzz(autoBuzz);
+    }
+}
+
+void eventAckRing()
+{
+    if (callbackAckRing) {
+        callbackAckRing();
+    }
 }
 
 void eventRing(bool testRing)
@@ -157,12 +178,15 @@ void readSwitches()
         setAutoBuzz(!autoBuzz);
     }
 
-    if (switchTestBuzz.checkRaise()) {
-        eventBuzz();
+    if (switchAckBuzz.checkRaise()) {
+        if (timerBellBlink.check()) {
+            eventAckRing();
+            if (!autoBuzz) eventBuzz(false);
+        }
     }
 
-    if (switchTestRing.checkRaise()) {
-        eventRing(true);
+    if (switchAck.checkRaise()) {
+        eventAckRing();
     }
 }
 

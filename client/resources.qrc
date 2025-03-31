@@ -1,11 +1,11 @@
 <RCC>
-    <qresource prefix="/img">
-        <file alias="bell.png">resources/bellimage-transparent.png</file>
-        <file alias="bell-autobuzz.png">resources/bellimage-autobuzz.png</file>
+	<qresource prefix="/img">
+		<file alias="bell.png">resources/bellimage-transparent.png</file>
+		<file alias="bell-autobuzz.png">resources/bellimage-autobuzz.png</file>
 		<file alias="bell-grey-off.png">resources/bellimage-grey-off.png</file>
 		<file alias="bell-grey.png">resources/bellimage-grey.png</file>
-    </qresource>
-    <qresource prefix="/audio">
-        <file alias="alarm.wav">resources/alarm.wav</file>
-    </qresource>
+	</qresource>
+	<qresource prefix="/audio">
+		<file alias="alarm.wav">resources/alarm.wav</file>
+	</qresource>
 </RCC>

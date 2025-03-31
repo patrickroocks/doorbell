@@ -4,6 +4,21 @@
 #define MAX_RAW_DATA_LENGTH  100 // 10sec
 #define MAX_RAW_DATA_STRINGS 20
 
+// =============================================
+//          Interface for time strings
+// =============================================
+
+String (*callbackTimeStr)() = nullptr;
+
+void setTimeStrGetter(String (*callback)())
+{
+    callbackTimeStr = callback;
+}
+
+// =============================================
+//         Class for debouncing a switch
+// =============================================
+
 class DebouncedSwitch
 {
 public:
@@ -20,9 +35,11 @@ public:
         return raise;
     }
 
-    const std::deque<String>& getRawDataStrings() const
+    std::deque<String> getRawDataStrings() const
     {
-        return rawDataStrings;
+        std::deque<String> rv = rawDataStrings;
+        if (currentlyCollectingRawData) rv.push_back(getRawDataStr());
+        return rv;
     }
 
 private:
@@ -47,14 +64,21 @@ private:
         }
     }
 
-    void generateRawDataString()
+    String getRawDataStr() const
     {
-        String rawDataStr = "";
+        String rawDataStr;
+        if (callbackTimeStr) {
+            rawDataStr = callbackTimeStr() + " ";
+        }
         for (auto& data : rawData) {
             rawDataStr += data ? "1" : "0";
         }
+        return rawDataStr;
+    }
 
-        rawDataStrings.push_back(rawDataStr);
+    void generateRawDataString()
+    {
+        rawDataStrings.push_back(getRawDataStr());
         if (rawDataStrings.size() > MAX_RAW_DATA_STRINGS) {
             rawDataStrings.pop_front();
         }
