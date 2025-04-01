@@ -1,5 +1,7 @@
 /client/build/*
+/client/CMakeLists.txt.user
 arduino_secrets.h
 /debug/*
 /broker-arduino/.vscode/*
 /project-doc/
+/client-release

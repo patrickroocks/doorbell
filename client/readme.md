@@ -1,44 +1,44 @@
-# Doorbell client/broker
-
-Project description: https://www.p-roocks.de/doorbell/
-
-Have a look at `doc/system-sketch.pdf` to get a technical overview over the project.
-
-# Doorbell broker
-
-The broker is an Arduino project in the subfolder `broker`. This reads the signals from the intercom and controls the relays. The MQTT broker runs also on the Arduino.
-
 # Doorbell client
 
-The client is a Qt6 project in the sub-folder `client`.
+This is the PC client to get the bell rings and control the buzzer. The client is a Qt6 project in the sub-folder `client`. Have a look at `../readme.md` for an overview of the entire project (broker & client).
 
-## General
+## Build
 
-This is the PC client to get the bell rings and control the buzzer. 
+The doorbell client needs Qt6, and we recommend Qt 6.8.3.
 
-## Prerequisites
-
-### MQTT
+### Build MQTT dependency
 
 The doorbell client needs QtMqtt to connect to the broker. To build QtMqtt:
-* Replace QtVersion in the following snippet (here 6.8.1).
+* Replace QtVersion in the following snippet (here 6.8.3).
 * Run the following snippet:
 
 ```
 sudo apt install ninja-build
 cd ~/tools/
-git clone git://code.qt.io/qt/qtmqtt.git -b 6.8.1
+git clone git://code.qt.io/qt/qtmqtt.git -b 6.8.3
 cd qtmqtt
 mkdir build && cd build
-/opt/Qt/6.8.1/gcc_64/bin/qt-configure-module ..
+/opt/Qt/6.8.3/gcc_64/bin/qt-configure-module ..
 /opt/Qt/Tools/CMake/bin/cmake --build .
 sudo /opt/Qt/Tools/CMake/bin/cmake --install . --verbose
 ```
 
 Taken from https://stackoverflow.com/questions/68928310/build-specific-modules-in-qt6-i-e-qtmqtt/71984521#71984521.
 
+### Build the client
 
-## Autostart Setup
+After the dependencies have been installed, build the doorbell client:
+
+```
+cd client
+mkdir build && cd build
+cmake .. -DCMAKE_PREFIX_PATH=/opt/Qt/6.8.3/gcc_64
+make -j8
+```
+
+## System configuration
+
+### Autostart setup
 
 To setup autostart for the doorbell broker within Ubuntu, do the following:
 
@@ -52,7 +52,7 @@ Fill in the following contents:
 ```
 [Desktop Entry]
 Type=Application
-Exec=~/code/doorbell/client/build/Desktop_Qt_6_8_1-Release/doorbell-client
+Exec=~/code/doorbell/client-release/doorbell-client
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
@@ -69,7 +69,7 @@ cp doorbell-client.desktop ~/.local/share/applications
 gtk-launch doorbell-client.desktop
 ```
 
-## Disable Wayland for Ring Popup
+### Disable Wayland for Ring Popup
 
 Placing the ring popup top right on the screen and in the foreground only works if wayland is disabled.
 

@@ -15,3 +15,7 @@ It contains two projects:
   * See `client/readme.md` for details.
 
 In `doc/system-sketch.pdf` the connections of the hardware are sketched.
+
+## Checkout
+
+git clone https://github.com/patrickroocks/doorbell doorbell
