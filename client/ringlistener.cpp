@@ -290,7 +290,7 @@ bool RingListener::checkForWifi()
 	}
 
 	conn.currentWifiPattern = cfgStore->getCurrentConfig().wlanPattern;
-	QRegularExpression ssidPattern("^" + conn.currentWifiPattern + "^");
+	QRegularExpression ssidPattern("^" + conn.currentWifiPattern + "$");
 	if (!ssidPattern.match(wlanSsid).hasMatch())
 	{
 		setMqttDisconnected("WiFi SSID (\"" + wlanSsid + "\") does not match pattern (\"" + conn.currentWifiPattern + "\")");
