@@ -1,4 +1,11 @@
+#include "timer.h"
 
+enum class EventState
+{
+    Idle,
+    Scheduled,
+    Running,
+};
 
 bool checkRaise(bool newState, bool& stateVar)
 {

@@ -36,6 +36,15 @@ cmake .. -DCMAKE_PREFIX_PATH=/opt/Qt/6.8.3/gcc_64
 make -j8
 ```
 
+### Build and deploy
+
+There is a script `client/build-and-deploy.sh` doing the following steps:
+* Clean the build
+* Build
+* Stop running doorbell-client
+* Move the build file to `../client-release/doorbell-client`
+* Start the new doorbell client
+
 ## System configuration
 
 ### Autostart setup
@@ -71,7 +80,7 @@ gtk-launch doorbell-client.desktop
 
 ### Disable Wayland for Ring Popup
 
-Placing the ring popup top right on the screen and in the foreground only works if wayland is disabled.
+Placing the ring popup top right on the screen and in the foreground only works if Wayland is disabled.
 
 * Set "WaylandEnable=false" in GNOME config:
 * Run `sudo nano /etc/gdm3/custom.conf`
@@ -80,4 +89,4 @@ Placing the ring popup top right on the screen and in the foreground only works 
 [daemon]
 WaylandEnable=false
 ```
-* reboot the system
+* Reboot the system

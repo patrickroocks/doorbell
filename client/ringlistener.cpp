@@ -2,6 +2,7 @@
 
 #include "configdiagnosticsdialog.h"
 #include "configstore.h"
+#include "constants.h"
 #include "ringapp.h"
 #include "ringdialog.h"
 #include "util.h"
@@ -304,17 +305,25 @@ void RingListener::updateConnState()
 {
 	emit connStateChanged(getConnStateStr());
 	updateIcon();
+	qDebug() << "Connection state changed:" << getConnStateStr();
+}
+
+void RingListener::reconnect()
+{
+	if (conn.hasMqttConn())
+		conn.mqtt.disconnectFromHost();
+	mqttConnect();
 }
 
 void RingListener::mqttConnect()
 {
 	conn.connStateDetails = "Connecting to MQTT broker...";
 	conn.state = Connection::Disconnected;
+	updateConnState();
 
 	if (!checkForWifi())
 		return;
 
-	qDebug() << "Connecting to MQTT broker...";
 	conn.currentBrokerAddr = cfgStore->getCurrentConfig().brokerAddr;
 	conn.tsLastActivity = QDateTime::currentDateTime();
 	conn.mqtt.setHostname(conn.currentBrokerAddr);
@@ -361,7 +370,7 @@ void RingListener::onMqttDisconnected()
 QString RingListener::getConnStateStr() const
 {
 	QString rv = (conn.state == Connection::DeviceConnected ? "Connected to" : "Disconnected from") + QString{" device since: "}
-				 + conn.tsLastConnStateChange.toString(Qt::DateFormat::ISODate);
+				 + conn.tsLastConnStateChange.toString(DateFormat);
 
 	if (!conn.connStateDetails.isEmpty())
 		rv += +", Details: " + conn.connStateDetails;
@@ -468,11 +477,12 @@ void RingListener::handleInternalStateByResponse(const Command& cmd, ResponseKin
 	if (timeout || pingWithoutPong)
 	{
 		if (timeout)
-			conn.connStateDetails = "Connected to broker, device not responding";
+			conn.connStateDetails = "Connected to MQTT broker, device not responding";
 		else
-			conn.connStateDetails = "Connected to broker, unexpected response from device: \"" + response + "\"";
+			conn.connStateDetails = "Connected to MQTT broker, unexpected response from device: \"" + response + "\"";
 
-		qDebug() << conn.connStateDetails;
+		conn.connStateDetails += ", last try at: " + cmdState.tsCommandSent.toString(DateFormat);
+		updateConnState();
 
 		if (conn.state == Connection::DeviceConnected)
 		{

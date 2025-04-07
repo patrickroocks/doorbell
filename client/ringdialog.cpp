@@ -3,9 +3,9 @@
 
 #include "command.h"
 #include "constants.h"
+#include "util.h"
 
 #include <QCloseEvent>
-#include <QPixmap>
 #include <QProcess>
 #include <QScreen>
 #include <QShowEvent>
@@ -25,10 +25,7 @@ RingDialog::RingDialog(RingListener* ringListener)
 	this->setFixedSize(this->size());
 
 	// Setup bell image
-	QPixmap pixmap(":/img/bell.png");
-	ui->lblBell->setPixmap(pixmap);
-	ui->lblBell->setScaledContents(true);
-	ui->lblBell->setGeometry(ui->lblBell->x(), ui->lblBell->y(), pixmap.width(), pixmap.height());
+	util::setPictureInLabel(":/img/bell.png", ui->lblBell);
 
 	// Setup connections
 	connect(&wavPlayTimer, &QTimer::timeout, this, &RingDialog::playWav);

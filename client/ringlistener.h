@@ -31,6 +31,7 @@ public:
 public slots:
 	// Used by Command client interface.
 	void sendCommand(const Command& cmd);
+	void reconnect();
 
 signals:
 	void receiveCommandResponse(const Command& cmd, const QByteArray& response);

@@ -2,6 +2,7 @@
 #include "ui_configdiagnosticsdialog.h"
 
 #include "configstore.h"
+#include "constants.h"
 #include "ringlistener.h"
 
 #include <QMessageBox>
@@ -63,6 +64,7 @@ void ConfigDiagnosticsDialog::establishUiConnections()
 	connect(ui->cmdChangeAutoBuzz, &QPushButton::clicked, this, &ConfigDiagnosticsDialog::changeAutoBuzz);
 	connect(ui->cmdTestBuzzer, &QPushButton::clicked, this, &ConfigDiagnosticsDialog::testBuzz);
 	connect(ui->cmdTestRing, &QPushButton::clicked, this, &ConfigDiagnosticsDialog::testRing);
+	connect(ui->cmdReconnectNow, &QPushButton::clicked, ringListener, &RingListener::reconnect);
 }
 
 void ConfigDiagnosticsDialog::restoreDefaults() { loadSettings(cfgStore->getDefaultConfig()); }
@@ -82,10 +84,13 @@ void ConfigDiagnosticsDialog::initializeCategories()
 	categories.push_back({"Settings", ui->wdgSettings});
 	categories.push_back({"Ring/Buzz log", ui->wdgActionLog});
 	categories.push_back({"Raw data", ui->wdgRawData});
+	categories.push_back({"About", ui->wdgAbout});
 
 	categoryListModel = QSharedPointer<CategoryListModel>::create(categories);
 	ui->lstCategory->setModel(categoryListModel.get());
 	connect(ui->lstCategory->selectionModel(), &QItemSelectionModel::selectionChanged, this, &ConfigDiagnosticsDialog::onCategoryChange);
+
+	prepareAboutWidget();
 
 	// Visibility of all widgets is initially false:
 	for (auto& category : categories) category.widget->setVisible(false);
@@ -108,6 +113,12 @@ void ConfigDiagnosticsDialog::initializeCategories()
 }
 
 ConfigDiagnosticsDialog::~ConfigDiagnosticsDialog() { delete ui; }
+
+void ConfigDiagnosticsDialog::prepareAboutWidget()
+{
+	util::setPictureInLabel(":/img/logo.png", ui->lblLogo);
+	ui->lblAbout->setText(ui->lblAbout->text().arg(Version));
+}
 
 void ConfigDiagnosticsDialog::onCategoryChange(const QItemSelection& selected, const QItemSelection& deselected)
 {

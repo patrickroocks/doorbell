@@ -1,6 +1,5 @@
 
 #include "debouncedSwitch.h"
-#include "timer.h"
 #include "utils.h"
 
 // =============================================
@@ -8,7 +7,8 @@
 // =============================================
 
 #define DOOR_OPEN_TIME  50  // 5 sec
-#define EXT_BELL_TIME   30  // 3 sec
+#define EXT_BELL_TIME   10  // 1 sec
+#define ACK_LED_TIME    10  // 1 sec
 #define BELL_BLINK_TIME 600 // 60 sec
 
 #define STARTUP_CYCLE_TIME 500 // 500ms
@@ -17,11 +17,11 @@
 //              SETUP
 // =============================================
 
-#define LED_ON             2
-#define LED_AUTOBUZZ       3
-#define LED_EXTBELL_BUZZER 4
-#define LED_ERROR          5
-#define LED_DOORBELL       6
+#define LED_ON           2
+#define LED_ACK_AUTOBUZZ 3
+#define LED_3_UNUSED     4
+#define LED_ERROR        5
+#define LED_DOORBELL     6
 
 #define FIRST_LED LED_ON
 #define LAST_LED  LED_DOORBELL
@@ -54,8 +54,14 @@ uint8_t ledSeq = FIRST_LED;
 DurationTimer timerDoorBuzzer(DOOR_OPEN_TIME);
 DurationTimer timerExtBell(EXT_BELL_TIME);
 DurationTimer timerBellBlink(BELL_BLINK_TIME);
+DurationTimer timerAckLedTimer(ACK_LED_TIME);
+
+// States for Buzzer and Ext Bell
+EventState stateDoorBuzzer = EventState::Idle;
+EventState stateExtBell = EventState::Idle;
 
 // System states
+bool ringActive = false;
 bool autoBuzz = false;
 bool wifiConnected = false;
 bool startupCycleCompleted = false;
@@ -97,8 +103,8 @@ void setupLeds()
 {
     // LEDs
     pinMode(LED_ON, OUTPUT);
-    pinMode(LED_AUTOBUZZ, OUTPUT);
-    pinMode(LED_EXTBELL_BUZZER, OUTPUT);
+    pinMode(LED_ACK_AUTOBUZZ, OUTPUT);
+    pinMode(LED_3_UNUSED, OUTPUT);
     pinMode(LED_ERROR, OUTPUT);
     pinMode(LED_DOORBELL, OUTPUT);
 
@@ -117,6 +123,35 @@ void setupLeds()
 
     // build-in LED for output
     pinMode(LED_BUILTIN, OUTPUT);
+}
+
+
+// =============================================
+//              INTERNAL EVENTS
+// =============================================
+
+void internalBuzz()
+{
+    if (stateDoorBuzzer == EventState::Idle) {
+        stateDoorBuzzer = EventState::Scheduled;
+    }
+}
+
+void internalRing()
+{
+    ringActive = true;
+    if (stateExtBell == EventState::Idle) {
+        stateExtBell = EventState::Scheduled;
+    }
+    timerBellBlink.start();
+}
+
+void internalAck()
+{
+    // ack from MQTT or from a button
+    ringActive = false;
+    timerBellBlink.stop();
+    timerAckLedTimer.start();
 }
 
 // =============================================
@@ -166,10 +201,14 @@ void writeLedsInNormalLoop()
     updateBlinkState();
     digitalWrite(LED_BUILTIN, HIGH);
     digitalWrite(LED_ON, HIGH);
-    digitalWrite(LED_AUTOBUZZ, autoBuzz ? blinkState : LOW);
-    digitalWrite(LED_EXTBELL_BUZZER, timerDoorBuzzer.check() ? blinkState : (timerExtBell.check() ? HIGH : LOW));
+    if (timerAckLedTimer.check()) {
+        digitalWrite(LED_ACK_AUTOBUZZ, HIGH);
+    } else {
+        digitalWrite(LED_ACK_AUTOBUZZ, autoBuzz ? blinkState : LOW);
+    }
     digitalWrite(LED_ERROR, !wifiConnected);
-    digitalWrite(LED_DOORBELL, timerBellBlink.check() ? blinkState : LOW);
+    // Blick in opposite state of the auto buzzer LED
+    digitalWrite(LED_DOORBELL, timerBellBlink.check() ? !blinkState : static_cast<uint8_t>(ringActive));
 }
 
 void readSwitches()
@@ -178,14 +217,12 @@ void readSwitches()
         setAutoBuzz(!autoBuzz);
     }
 
-    if (switchAckBuzz.checkRaise()) {
-        if (timerBellBlink.check()) {
-            eventAckRing();
-            if (!autoBuzz) eventBuzz(false);
-        }
+    if (switchAckBuzz.checkRaise() && ringActive) {
+        eventAckRing();
+        if (!autoBuzz) eventBuzz(false);
     }
 
-    if (switchAck.checkRaise()) {
+    if (switchAck.checkRaise() && ringActive) {
         eventAckRing();
     }
 }
@@ -200,12 +237,33 @@ void readInputs()
 
 void handleRelays()
 {
-    digitalWrite(RELAY_BUZZER, timerDoorBuzzer.check() ? HIGH : LOW);
-    digitalWrite(RELAY_EXT_BELL, timerExtBell.check() ? HIGH : LOW);
+    // Never turn of both relays at the same time,
+    // the power consumption is probably too high.
+
+    // Scheduled -> Running - only if no other relay is running
+    if (stateExtBell == EventState::Scheduled && stateDoorBuzzer != EventState::Running) {
+        stateExtBell = EventState::Running;
+        timerExtBell.start();
+    } else if (stateDoorBuzzer == EventState::Scheduled && stateExtBell != EventState::Running) {
+        stateDoorBuzzer = EventState::Running;
+        timerDoorBuzzer.start();
+    }
+
+    // Running -> Idle
+    if (stateExtBell == EventState::Running && !timerExtBell.check()) {
+        stateExtBell = EventState::Idle;
+    }
+    if (stateDoorBuzzer == EventState::Running && !timerDoorBuzzer.check()) {
+        stateDoorBuzzer = EventState::Idle;
+    }
+
+    digitalWrite(RELAY_BUZZER, stateDoorBuzzer == EventState::Running ? HIGH : LOW);
+    digitalWrite(RELAY_EXT_BELL, stateExtBell == EventState::Running ? HIGH : LOW);
 }
 
 void decrementTimers()
 {
+    timerAckLedTimer.decrement();
     timerDoorBuzzer.decrement();
     timerExtBell.decrement();
     timerBellBlink.decrement();

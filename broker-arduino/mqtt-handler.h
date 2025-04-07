@@ -109,8 +109,7 @@ void writeRingToMqtt(bool testRing)
 
     if (client.connected()) {
         String pubString = ringStr + " ";
-        if (autoBuzz && !testRing)
-            pubString += "auto buzz, ";
+        if (autoBuzz && !testRing) pubString += "auto buzz, ";
         pubString += getDateTime();
         client.publish(ringTopic, pubString.c_str());
     } else {
@@ -122,8 +121,8 @@ void ringAndWriteToMqtt(bool testRing)
 {
     writeRingToMqtt(testRing);
 
-    timerExtBell.start();
-    timerBellBlink.start();
+    internalRing();
+
 
     if (autoBuzz && !testRing) {
         eventBuzz(true);
@@ -132,13 +131,13 @@ void ringAndWriteToMqtt(bool testRing)
 
 void buzzAndWriteToLog(bool autoBuzz)
 {
-    timerDoorBuzzer.start();
+    internalBuzz();
     addToActionLog(String{"buzz "} + (autoBuzz ? " (auto)" : "(manual)"));
 }
 
 void ackRingAndWriteToMqtt()
 {
-    timerBellBlink.stop();
+    internalAck();
 
     if (client.connected()) {
         client.publish(ringTopic, msgAckRing);
@@ -196,7 +195,7 @@ void callbackMqtt(char* topic, byte* payload, unsigned int length)
         } else if (payloadStr == cmdGetAutoBuzz) {
             client.publish(responseTopic, autoBuzz ? msgAutoBuzzOn : msgAutoBuzzOff);
         } else if (payloadStr == cmdAckRing) {
-            timerBellBlink.stop();
+            internalAck();
         } else if (payloadStr == cmdRawData) {
             showRawData();
         } else if (payloadStr == cmdGetStartTime) {

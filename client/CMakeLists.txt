@@ -28,6 +28,7 @@ add_executable(doorbell-client
 	command.h command.cpp
 	util.h util.cpp
 	commandclient.h commandclient.cpp
+	build-and-deploy.sh
 
 )
 

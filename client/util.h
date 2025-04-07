@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QtCore>
+#include <qlabel.h>
 
 namespace util
 {
@@ -8,6 +9,8 @@ namespace util
 QString boolToActiveStr(bool val);
 
 QString getJsonStringWithDefault(const QJsonObject& obj, const QString& key, const QString& defaultValue);
+
+void setPictureInLabel(const QString& filePath, QLabel* label);
 
 } // namespace util
 

@@ -53,6 +53,7 @@ private slots:
 	void onCategoryChange(const QItemSelection& selected, const QItemSelection& deselected);
 
 private:
+	void prepareAboutWidget();
 	void loadSettings(const Config& config);
 	void applySettings();
 	void restoreDefaults();

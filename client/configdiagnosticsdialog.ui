@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>2001</width>
-    <height>794</height>
+    <height>1184</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -17,7 +17,7 @@
    </sizepolicy>
   </property>
   <property name="windowTitle">
-   <string>Dialog</string>
+   <string>Doorbell client - Configuration &amp; Diagnostics</string>
   </property>
   <widget class="QDialogButtonBox" name="buttonBox">
    <property name="geometry">
@@ -128,7 +128,7 @@
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>180</y>
+      <y>210</y>
       <width>221</width>
       <height>31</height>
      </rect>
@@ -141,7 +141,7 @@
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>220</y>
+      <y>250</y>
       <width>221</width>
       <height>31</height>
      </rect>
@@ -215,13 +215,26 @@
     <property name="geometry">
      <rect>
       <x>240</x>
-      <y>180</y>
+      <y>210</y>
       <width>341</width>
       <height>31</height>
      </rect>
     </property>
     <property name="text">
      <string>A test ring will not trigger the auto buzzer.</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="cmdReconnectNow">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>170</y>
+      <width>221</width>
+      <height>31</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Reconnect now</string>
     </property>
    </widget>
   </widget>
@@ -406,6 +419,55 @@
     </property>
     <property name="textInteractionFlags">
      <set>Qt::TextInteractionFlag::TextSelectableByKeyboard|Qt::TextInteractionFlag::TextSelectableByMouse</set>
+    </property>
+   </widget>
+  </widget>
+  <widget class="QWidget" name="wdgAbout" native="true">
+   <property name="geometry">
+    <rect>
+     <x>210</x>
+     <y>800</y>
+     <width>871</width>
+     <height>361</height>
+    </rect>
+   </property>
+   <widget class="QLabel" name="lblAbout">
+    <property name="geometry">
+     <rect>
+      <x>380</x>
+      <y>20</y>
+      <width>471</width>
+      <height>331</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">background-color: rgb(211, 215, 207);
+border: 1px solid black;</string>
+    </property>
+    <property name="text">
+     <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:14pt; font-weight:600; color:#4e9a06;&quot;&gt;doorbell-client&lt;/span&gt;&lt;/p&gt;&lt;p&gt;Connection to the house intercom via the doorbell-broker (Arduino)&lt;br/&gt;&lt;/p&gt;&lt;p&gt;Version: %1&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;https://github.com/patrickroocks/doorbell&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;doorbell on GitHub&lt;/span&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;https://github.com/patrickroocks/doorbell&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;doorbell&lt;/span&gt;&lt;/a&gt;&lt;a href=&quot;https://www.p-roocks.de/wordpress2/software/doorbell/&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt; on my personal web page&lt;/span&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;Copyright 2025 by Patrick Roocks (&lt;a href=&quot;mailto:mail@p-roocks.de&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;mail@p-roocks.de&lt;/span&gt;&lt;/a&gt;)&lt;/p&gt;&lt;p&gt;License: MIT License&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignTop</set>
+    </property>
+    <property name="openExternalLinks">
+     <bool>true</bool>
+    </property>
+   </widget>
+   <widget class="QLabel" name="lblLogo">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>20</y>
+      <width>67</width>
+      <height>17</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">border: 1px solid black;</string>
+    </property>
+    <property name="text">
+     <string>[img_bell]</string>
     </property>
    </widget>
   </widget>
