@@ -1,61 +1,38 @@
-
+#pragma once
 
 class BaseTimer
 {
 public:
-    BaseTimer(int cycles)
-        : cycles(cycles)
-    {}
+    BaseTimer(int cycles);
 
-    void start()
-    {
-        count = cycles;
-    }
-
-    void stop()
-    {
-        count = -1;
-    }
-
-    void decrement()
-    {
-        if (count >= -1) --count;
-    }
+    void start();
+    void stop();
+    void decrement();
 
 protected:
-    const int cycles = 0;
+    const int cycles;
     int count = 0;
 };
 
-class EventTimer : public BaseTimer
+// --------------------------------------------------------------
+
+class EventTimer final : public BaseTimer
 {
 public:
-    EventTimer(int cycles, bool autoRestart = false)
-        : BaseTimer(cycles)
-        , autoRestart(autoRestart)
-    {}
+    EventTimer(int cycles, bool autoRestart = false);
 
-    bool checkAndDecrement()
-    {
-        bool eventRaise = count == 0;
-        decrement();
-        if (eventRaise && autoRestart) start();
-        return eventRaise;
-    }
+    bool checkAndDecrement();
 
 private:
     bool autoRestart = false;
 };
 
-class DurationTimer : public BaseTimer
+// --------------------------------------------------------------
+
+class DurationTimer final : public BaseTimer
 {
 public:
-    DurationTimer(int cycles)
-        : BaseTimer(cycles)
-    {}
+    DurationTimer(int cycles);
 
-    bool check()
-    {
-        return count > 0;
-    }
+    bool check();
 };

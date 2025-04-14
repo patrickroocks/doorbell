@@ -1,108 +1,35 @@
-#include <deque>
-#include <vector>
+#pragma once
 
-#define MAX_RAW_DATA_LENGTH  100 // 10sec
-#define MAX_RAW_DATA_STRINGS 20
+#include <Arduino.h>
 
-// =============================================
-//          Interface for time strings
-// =============================================
+#include "circularArray.h"
 
-String (*callbackTimeStr)() = nullptr;
+constexpr int MaxRawDataLength = 100; // 10sec
+constexpr int MaxRawDataStrings = 20;
 
-void setTimeStrGetter(String (*callback)())
-{
-    callbackTimeStr = callback;
-}
+class App;
+class NetworkHandler;
 
-// =============================================
-//         Class for debouncing a switch
-// =============================================
-
-class DebouncedSwitch
+class DebouncedSwitch final
 {
 public:
-    DebouncedSwitch(int pin, int debounceCycles, bool rawDataLoggingEnabled = false)
-        : pin(pin)
-        , debounceCycles(debounceCycles)
-        , rawDataLoggingEnabled(rawDataLoggingEnabled){};
+    DebouncedSwitch(int pin, int debounceCycles, App* app, bool rawDataLoggingEnabled = false);
+    void setup();
 
-    bool checkRaise()
-    {
-        readState();
-        const bool raise = lastState && !lastDebounceState;
-        lastDebounceState = lastState;
-        return raise;
-    }
+    bool checkRaise();
 
-    std::deque<String> getRawDataStrings() const
-    {
-        std::deque<String> rv = rawDataStrings;
-        if (currentlyCollectingRawData) rv.push_back(getRawDataStr());
-        return rv;
-    }
+    const CircularArray<String, MaxRawDataStrings>& getArchivedRawDataStrings() const;
+    String getCurrentRawDataStr() const;
 
 private:
-    void collectRawData(bool isPressed)
-    {
-        if (!rawDataLoggingEnabled) return;
-
-        // If pressed, start new raw data monitoring.
-        if (isPressed) {
-            currentlyCollectingRawData = true;
-            rawData.reserve(MAX_RAW_DATA_LENGTH);
-        }
-
-        // Collect raw data if started, until max length is reached.
-        if (currentlyCollectingRawData) {
-            rawData.push_back(isPressed);
-            if (rawData.size() >= MAX_RAW_DATA_LENGTH) {
-                generateRawDataString();
-                rawData.clear();
-                currentlyCollectingRawData = false;
-            }
-        }
-    }
-
-    String getRawDataStr() const
-    {
-        String rawDataStr;
-        if (callbackTimeStr) {
-            rawDataStr = callbackTimeStr() + " ";
-        }
-        for (auto& data : rawData) {
-            rawDataStr += data ? "1" : "0";
-        }
-        return rawDataStr;
-    }
-
-    void generateRawDataString()
-    {
-        rawDataStrings.push_back(getRawDataStr());
-        if (rawDataStrings.size() > MAX_RAW_DATA_STRINGS) {
-            rawDataStrings.pop_front();
-        }
-    }
-
-    void readState()
-    {
-        // All switches/inputs are grounded, so HIGH means not pressed.
-        bool isPressed = digitalRead(pin) == LOW;
-
-        collectRawData(isPressed);
-
-        if (isPressed != lastState) {
-            debounceCounter++;
-            if (debounceCounter >= debounceCycles) {
-                lastState = isPressed;
-                debounceCounter = 0;
-            }
-        } else {
-            debounceCounter = 0;
-        }
-    }
+    void collectRawData(bool isPressed);
+    String getRawDataStr() const;
+    void readState();
 
 private:
+    App* const app;
+    NetworkHandler* networkHandler = nullptr;
+
     const int pin;
     const int debounceCycles;
     const bool rawDataLoggingEnabled;
@@ -111,6 +38,7 @@ private:
     int debounceCounter = 0;
 
     bool currentlyCollectingRawData = false;
-    std::vector<int> rawData;
-    std::deque<String> rawDataStrings;
+
+    CircularArray<int, MaxRawDataLength> rawData;
+    CircularArray<String, MaxRawDataStrings> rawDataStrings;
 };

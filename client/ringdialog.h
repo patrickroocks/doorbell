@@ -10,6 +10,7 @@ namespace Ui {
 class RingDialog;
 }
 
+class RingApp;
 class RingListener;
 
 class RingDialog : public CommandClientDialog
@@ -17,7 +18,7 @@ class RingDialog : public CommandClientDialog
 	Q_OBJECT
 
 public:
-	explicit RingDialog(RingListener* ringListener);
+	explicit RingDialog(RingApp* app, RingListener* ringListener);
 	void closeEvent(QCloseEvent * event) override;
 	~RingDialog();
 
@@ -38,6 +39,7 @@ private:
 	void okOrOpen();
 
 	Ui::RingDialog * ui;
+	RingApp* const ringApp;
 	QProcess wavPlayProcess;
 	QTimer wavPlayTimer;
 	QByteArray additionalInfos;

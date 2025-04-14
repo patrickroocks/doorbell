@@ -21,9 +21,9 @@ const int MainLoopTimeout = 1000;
 
 } // namespace
 
-RingListener::RingListener(RingApp* app)
-	: app(app->getApplication())
-	, cfgStore(app->getConfigStore())
+RingListener::RingListener(RingApp* ringApp)
+	: ringApp(ringApp)
+	, cfgStore(ringApp->getConfigStore())
 {
 	setupMqtt();
 	setupTray();
@@ -112,7 +112,7 @@ void RingListener::mainLoopHandleCommands(const QDateTime& now)
 
 void RingListener::setupDialog()
 {
-	ringDlg = QSharedPointer<RingDialog>::create(this);
+	ringDlg = QSharedPointer<RingDialog>::create(ringApp, this);
 	connect(ringDlg.get(), &RingDialog::dialogClosed, this, &RingListener::updateIcon);
 
 	cfgDiagDlg = QSharedPointer<ConfigDiagnosticsDialog>::create(this, cfgStore);
@@ -123,7 +123,7 @@ void RingListener::setupTray()
 	if (!QSystemTrayIcon::isSystemTrayAvailable())
 	{
 		qWarning("System tray is not available on this system.");
-		app->quit();
+		ringApp->getApplication()->quit();
 	}
 
 	// Auto Buzz toggle
@@ -159,7 +159,7 @@ void RingListener::setupTray()
 
 	// Quit
 	tray.quitAction.reset(new QAction("Quit", &tray.menu));
-	connect(tray.quitAction.get(), &QAction::triggered, app, &QApplication::quit);
+	connect(tray.quitAction.get(), &QAction::triggered, ringApp->getApplication(), &QApplication::quit);
 	tray.menu.addAction(tray.quitAction.get());
 
 	tray.iconOff = QIcon{":/img/bell-grey-off.png"};

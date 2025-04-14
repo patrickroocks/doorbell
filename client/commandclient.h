@@ -22,4 +22,3 @@ protected:
 private:
 	RingListener* const ringListener;
 };
-

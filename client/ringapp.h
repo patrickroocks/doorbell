@@ -13,6 +13,7 @@ public:
 	QApplication* getApplication() { return &app; }
 	const QString& getExecDir() const { return execDir; }
 	ConfigStore* getConfigStore() { return configStore.data(); }
+	QString getWavPath() const;
 
 	int run();
 

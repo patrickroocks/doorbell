@@ -18,11 +18,13 @@ RingApp::RingApp(int argc, char* argv[])
 	listener = QSharedPointer<RingListener>::create(this);
 }
 
+QString RingApp::getWavPath() const { return execDir + TmpAlarmFile; }
+
 void RingApp::copyAlarmFile()
 {
 	QFile resourceFile(":/audio/alarm.wav");
 	if (resourceFile.open(QIODevice::ReadOnly)) {
-		QFile outFile(execDir + TmpAlarmFile);
+		QFile outFile(getWavPath());
 		if (outFile.open(QIODevice::WriteOnly)) {
 			outFile.write(resourceFile.readAll());
 			outFile.close();

@@ -1,37 +1,13 @@
-#include "mqtt-handler.h"
+#include "app.h"
 
-// =============================================
-//              main config
-// =============================================
-
-#define SAMPLE_TIME 100
-
-// =============================================
-//              SETUP
-// =============================================
+App app;
 
 void setup()
 {
-    // setup serial
-    Serial.begin(115200);
-
-    // LEDs are already needed for WIFI setup (blinking!)
-    setupLeds();
-    setupWifiAndMqtt();
+    app.setup();
 }
-
-// =============================================
-//              LOOP
-// =============================================
 
 void loop()
 {
-    loopClients();
-
-    if (startupCycleCompleted) {
-        delay(SAMPLE_TIME);
-        loopState();
-    } else {
-        waitCycle();
-    }
+    app.loop();
 }

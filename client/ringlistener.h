@@ -74,7 +74,7 @@ private:
 
 	QSharedPointer<RingDialog> ringDlg;
 	QSharedPointer<ConfigDiagnosticsDialog> cfgDiagDlg;
-	const QApplication* const app;
+	RingApp* const ringApp;
 	ConfigStore* const cfgStore;
 
 	struct MainLoop

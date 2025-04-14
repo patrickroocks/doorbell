@@ -10,9 +10,12 @@
 #include <QScreen>
 #include <QShowEvent>
 
-RingDialog::RingDialog(RingListener* ringListener)
+#include "ringapp.h"
+
+RingDialog::RingDialog(RingApp* app, RingListener* ringListener)
 	: CommandClientDialog(ringListener)
 	, ui(new Ui::RingDialog)
+	, ringApp(app)
 	, wavPlayProcess(this)
 {
 	ui->setupUi(this);
@@ -90,7 +93,7 @@ void RingDialog::closeDialog()
 	emit dialogClosed();
 }
 
-void RingDialog::playWav() { wavPlayProcess.start("aplay", {TmpAlarmFile}); }
+void RingDialog::playWav() { wavPlayProcess.start("aplay", {ringApp->getWavPath()}); }
 
 void RingDialog::okOrOpen()
 {
