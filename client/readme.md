@@ -38,7 +38,7 @@ make -j8
 
 ### Build and deploy
 
-There is a script [client/build-and-deploy.sh](client/build-and-deploy.sh) doing the following steps:
+There is a script [build-and-deploy.sh](build-and-deploy.sh) doing the following steps:
 * Clean the build
 * Build
 * Stop running doorbell-client
