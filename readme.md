@@ -13,9 +13,12 @@ It contains two projects:
   * Displays a "door ring detected" popup, when a ring message is received via MQTT.
   * Offers a "open door" button to activate the door buzzer.
   * Allows to configure the connection and offers some diagnostics.
-  * See `client/readme.md` for details.
+  * See [client/readme.md](client/readme.md) for details.
 
-In `doc/system-sketch.pdf` the connections of the hardware are sketched.
+Related docs:
+* In [doc/system-sketch.pdf](doc/system-sketch.pdf) the connections of the hardware are sketched.
+* In [CHANGES.md](CHANGES.md) the history of the project is documented.
+
 
 ## Checkout
 
