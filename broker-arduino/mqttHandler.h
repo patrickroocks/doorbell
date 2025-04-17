@@ -23,7 +23,7 @@ public:
 
     void writeRingToMqttAndLog(bool testRing);
     void writeBuzzToLog(bool autoBuzz);
-    void writeAutoBuzzStateToMqtt(bool newAutoBuzzState);
+    void writeAutoBuzzStateToLogAndMqtt(bool newAutoBuzzState);
     void writeAckRingToMqtt();
     bool getMqttConnected() const;
 

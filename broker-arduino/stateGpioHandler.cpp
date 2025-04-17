@@ -147,7 +147,7 @@ void StateGpioHandler::ring(bool testRing)
     timerBellBlink.start();
 
     if (autoBuzz) {
-        scheduleEvent(stateDoorBuzzer);
+        buzz();
     }
 }
 
@@ -159,10 +159,9 @@ void StateGpioHandler::buzz()
 
 void StateGpioHandler::setAutoBuzzState(bool newAutoBuzzState)
 {
-    const bool valueChanged = newAutoBuzzState != autoBuzz;
+    if (newAutoBuzzState == autoBuzz) return;
     autoBuzz = newAutoBuzzState;
-    mqttHandler->writeAutoBuzzStateToMqtt(newAutoBuzzState);
-    if (valueChanged) writeEeprom();
+    mqttHandler->writeAutoBuzzStateToLogAndMqtt(newAutoBuzzState);
 }
 
 bool StateGpioHandler::getAutoBuzzState() const

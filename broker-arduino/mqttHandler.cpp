@@ -75,8 +75,7 @@ void MqttHandler::setupMqttClient()
     client.setBufferSize(1024);
     client.setServer(MqttServerAddr, 1883);
     client.setCallback([this](char* topic, byte* payload, unsigned int length) { callbackMqtt(topic, payload, length); });
-    Serial.println("MQTT Client started. Destination: ");
-    Serial.println(MqttServerAddr);
+    Serial.println("MQTT Client started.");
 }
 
 void MqttHandler::setup()
@@ -86,7 +85,7 @@ void MqttHandler::setup()
     networkHandler = app->getNetworkHandler();
 
     startTime = networkHandler->getDateTime();
-    addToActionLog("Device started");
+    addToActionLog(String("Device started, initial autoBuzz is ") + (stateGpioHandler->getAutoBuzzState() ? "on" : "off"));
 
     setupMqttBroker();
     setupMqttClient();
@@ -171,9 +170,10 @@ void MqttHandler::showRawData()
     client.publish(ResponseTopic, MsgEndMultiResponse);
 }
 
-void MqttHandler::writeAutoBuzzStateToMqtt(bool newAutoBuzzState)
+void MqttHandler::writeAutoBuzzStateToLogAndMqtt(bool newAutoBuzzState)
 {
     client.publish(RingTopic, newAutoBuzzState ? MsgAutoBuzzOn : MsgAutoBuzzOff);
+    actionLog.push(networkHandler->getDateTime() + " autoBuzz " + (newAutoBuzzState ? "on" : "off"));
 }
 
 void MqttHandler::writeAckRingToMqtt()
@@ -187,7 +187,6 @@ void MqttHandler::writeRingToMqttAndLog(bool testRing)
 {
     const String ringStr = testRing ? MsgTestRing : MsgRing;
 
-    Serial.println(ringStr + " detected");
     addToActionLog(ringStr);
 
     if (client.connected()) {
@@ -202,7 +201,7 @@ void MqttHandler::writeRingToMqttAndLog(bool testRing)
 
 void MqttHandler::writeBuzzToLog(bool autoBuzz)
 {
-    addToActionLog(String{"buzz "} + (autoBuzz ? " (auto)" : "(manual)"));
+    addToActionLog(String{"buzz "} + (autoBuzz ? "(auto)" : "(manual)"));
 }
 
 void MqttHandler::showActionLog()

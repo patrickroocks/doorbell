@@ -53,6 +53,7 @@ void App::setup()
 
     // LEDs are already needed for WIFI setup (blinking!)
     stateGpioHandler->setup();
+    stateGpioHandler->waitSeconds(1); // ensures we see all LEDs at least once
     networkHandler->setup();
     mqttHandler->setup();
 }

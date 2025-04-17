@@ -10,6 +10,7 @@
 namespace
 {
 const int BorderSize = 5;
+const QString WidgetBorderStyle = "#BorderWdg {border: 1px solid #C2C2C2;}";
 }
 
 CategoryListModel::CategoryListModel(const std::vector<Category>& categories)
@@ -95,15 +96,36 @@ void ConfigDiagnosticsDialog::initializeCategories()
 	// Visibility of all widgets is initially false:
 	for (auto& category : categories) category.widget->setVisible(false);
 
-	// Place all the widges to the primary widget
 	const auto primaryWidget = categories.at(0).widget;
-	for (auto& category : categories) category.widget->setGeometry(primaryWidget->geometry());
+
+	// Place categories left
+	ui->lstCategory->setGeometry(BorderSize, BorderSize, ui->lstCategory->geometry().width(), primaryWidget->geometry().height());
+
+	// Place primary widget right to the button box
+	primaryWidget->setGeometry(ui->lstCategory->geometry().right() + BorderSize,
+							   BorderSize,
+							   primaryWidget->geometry().width(),
+							   primaryWidget->geometry().height());
+
+	// Place ButtonBox at the bottom of the dialog, spaning over categories and primary widget
+	ui->buttonBox->setGeometry(BorderSize,
+							   primaryWidget->geometry().height() + 2 * BorderSize,
+							   primaryWidget->geometry().width() + BorderSize + ui->lstCategory->geometry().width(),
+							   ui->buttonBox->geometry().height());
 
 	// Size of the dialog is adjusted to button box
 	this->setGeometry(this->geometry().left(),
 					  this->geometry().top(),
 					  ui->buttonBox->geometry().right() + BorderSize,
 					  ui->buttonBox->geometry().bottom() + BorderSize);
+
+	// Place all the widges equally to the primary widget
+	for (auto& category : categories)
+	{
+		category.widget->setGeometry(primaryWidget->geometry());
+		category.widget->setObjectName("BorderWdg");
+		category.widget->setStyleSheet(WidgetBorderStyle);
+	}
 
 	// Do not allow to resize the dialog:
 	this->setFixedSize(this->size());
@@ -118,6 +140,8 @@ void ConfigDiagnosticsDialog::prepareAboutWidget()
 {
 	util::setPictureInLabel(":/img/logo.png", ui->lblLogo);
 	ui->lblAbout->setText(ui->lblAbout->text().arg(Version));
+	// height of about label should be equal to height of logo
+	ui->lblAbout->setGeometry(ui->lblAbout->x(), ui->lblLogo->y(), ui->lblAbout->width(), ui->lblLogo->height());
 }
 
 void ConfigDiagnosticsDialog::onCategoryChange(const QItemSelection& selected, const QItemSelection& deselected)
