@@ -6,7 +6,7 @@ class StateGpioHandler;
 class MqttHandler;
 class NetworkHandler;
 
-class App
+class App final
 {
 public:
     App();

@@ -86,6 +86,9 @@ void MqttHandler::setup()
 
     startTime = networkHandler->getDateTime();
     addToActionLog(String("Device started, initial autoBuzz is ") + (stateGpioHandler->getAutoBuzzState() ? "on" : "off"));
+    if (!networkHandler->hasValidTime()) {
+        networkHandler->setRequestLogWhenValidTime();
+    }
 
     setupMqttBroker();
     setupMqttClient();

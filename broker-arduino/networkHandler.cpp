@@ -2,6 +2,7 @@
 
 #include "app.h"
 #include "arduinoSecrets.h"
+#include "mqttHandler.h"
 #include "stateGpioHandler.h"
 #include "timing.h"
 
@@ -15,7 +16,12 @@ NetworkHandler::NetworkHandler(App* app)
 
 String NetworkHandler::getDateTime()
 {
-    return ntp.formattedTime("%Y-%m-%d %H:%M:%S");
+    if (validTime) {
+        return ntp.formattedTime("%Y-%m-%d %H:%M:%S");
+    } else {
+        // return seconds since device start:
+        return "(No NTP time, seconds since device start: " + String(millis() / 1000) + ")";
+    }
 }
 
 void NetworkHandler::setup()
@@ -55,6 +61,13 @@ void NetworkHandler::loop()
     // Loop NTP
     if (wifiConnected) {
         if (ntpTimer.checkAndDecrement()) ntp.update();
+        if (!validTime) {
+            validTime = ntp.year() != 1970;
+            if (logWhenValidTime) {
+                mqttHandler->addToActionLog("Received first NTP time");
+                logWhenValidTime = false;
+            }
+        }
     }
 }
 
@@ -82,9 +95,20 @@ void NetworkHandler::setupNTP()
     ntp.ruleDST("CEST", Last, Sun, Mar, 2, 120);
     ntp.ruleSTD("CET", Last, Sun, Oct, 3, 60);
     ntp.begin();
+    validTime = ntp.year() != 1970;
 }
 
 bool NetworkHandler::getWifiConnected() const
 {
     return wifiConnected;
+}
+
+bool NetworkHandler::hasValidTime() const
+{
+    return validTime;
+}
+
+void NetworkHandler::setRequestLogWhenValidTime()
+{
+    logWhenValidTime = true;
 }

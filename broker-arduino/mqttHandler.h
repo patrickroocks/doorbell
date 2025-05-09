@@ -12,7 +12,7 @@ class App;
 class StateGpioHandler;
 class NetworkHandler;
 
-class MqttHandler
+class MqttHandler final
 {
 public:
     MqttHandler(App* app);
@@ -26,13 +26,13 @@ public:
     void writeAutoBuzzStateToLogAndMqtt(bool newAutoBuzzState);
     void writeAckRingToMqtt();
     bool getMqttConnected() const;
+    void addToActionLog(const String& action);
 
 private:
     void setupMqttBroker();
     void setupMqttClient();
 
     void callbackMqtt(char* topic, byte* payload, unsigned int length);
-    void addToActionLog(const String& action);
     void showActionLog();
     void showRawData();
 

@@ -7,7 +7,7 @@ class App;
 class MqttHandler;
 class NetworkHandler;
 
-class StateGpioHandler
+class StateGpioHandler final
 {
 public:
     StateGpioHandler(App* app);
