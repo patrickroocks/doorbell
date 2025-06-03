@@ -44,8 +44,11 @@ void RingListener::setupMqtt()
 
 void RingListener::setupMainLoop()
 {
+	// Use a timer and not SingleShot, as SingleShot seems not to be robust across restarts.
+	connect(&mainLoop.timer, &QTimer::timeout, this, &RingListener::runMainLoop);
 	mainLoop.tsLastRun = QDateTime::currentDateTime();
-	QTimer::singleShot(MainLoopCycle, this, &RingListener::runMainLoop);
+	mainLoop.timer.setInterval(MainLoopCycle);
+	mainLoop.timer.start();
 }
 
 void RingListener::runMainLoop()
@@ -53,7 +56,6 @@ void RingListener::runMainLoop()
 	const auto now = QDateTime::currentDateTime();
 	mainLoopHandleConnection(now);
 	mainLoopHandleCommands(now);
-	QTimer::singleShot(MainLoopCycle, this, &RingListener::runMainLoop);
 }
 
 void RingListener::mainLoopHandleConnection(const QDateTime& now)
@@ -370,10 +372,10 @@ void RingListener::onMqttDisconnected()
 QString RingListener::getConnStateStr() const
 {
 	QString rv = (conn.state == Connection::DeviceConnected ? "Connected to" : "Disconnected from") + QString{" device since: "}
-				 + conn.tsLastConnStateChange.toString(DateFormat);
+				 + conn.tsLastConnStateChange.toString(DateFormat) + ".";
 
 	if (!conn.connStateDetails.isEmpty())
-		rv += +", Details: " + conn.connStateDetails;
+		rv += "\nDetails: " + conn.connStateDetails;
 
 	return rv;
 }

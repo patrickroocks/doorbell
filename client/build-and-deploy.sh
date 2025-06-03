@@ -1,4 +1,4 @@
-# Build
+echo "Build new doorbell client..."
 rm -rf build
 mkdir build
 cd build
@@ -6,7 +6,7 @@ cmake .. -DCMAKE_PREFIX_PATH=/opt/Qt/6.8.3/gcc_64
 make -j8
 cd ..
 
-# Stop running doorbell-client
+echo "Stop running client..."
 pids=$(pgrep "doorbell-client")
 
 if [ -z "$pids" ]; then
@@ -20,6 +20,8 @@ fi
 
 # Wait that the file becomes writeable
 sleep 2
+
+echo "Copy new client to relase directory and start it..."
 
 # Copy it
 mkdir -p ../client-release
