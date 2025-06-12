@@ -1,3 +1,8 @@
+# Version 0.2.1, 2025-06-12
+
+- Client
+  - Fix that the main loop got stuck sometimes
+
 # Version 0.2, 2025-04-17
 
 - Broker:

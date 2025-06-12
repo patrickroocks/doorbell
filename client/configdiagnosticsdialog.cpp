@@ -6,6 +6,7 @@
 #include "ringlistener.h"
 
 #include <QMessageBox>
+#include <QScreen>
 
 namespace
 {
@@ -78,6 +79,18 @@ void ConfigDiagnosticsDialog::subscribeToState()
 	ui->lblAutoBuzzerState->setText(ringListener->getAutoBuzzStateStr());
 	connect(ringListener, &RingListener::autoBuzzStateChanged, ui->lblAutoBuzzerState, &QLabel::setText);
 }
+
+void ConfigDiagnosticsDialog::placeCenter()
+{
+	QScreen* screen = QGuiApplication::primaryScreen();
+	QRect screenGeometry = screen->geometry();
+	// Place in the center:
+	const int x = (screenGeometry.width() - this->width()) / 2;
+	const int y = (screenGeometry.height() - this->height()) / 2;
+	this->setGeometry(x, y, this->width(), this->height());
+}
+
+void ConfigDiagnosticsDialog::showEvent(QShowEvent* event) { placeCenter(); }
 
 void ConfigDiagnosticsDialog::initializeCategories()
 {

@@ -25,28 +25,31 @@ RingListener::RingListener(RingApp* ringApp)
 	: ringApp(ringApp)
 	, cfgStore(ringApp->getConfigStore())
 {
-	setupMqtt();
+	const auto now = QDateTime::currentDateTime();
+	setupMqtt(now);
 	setupTray();
 	setupDialog();
-	setupMainLoop();
+	setupMainLoop(now);
 }
 
-void RingListener::setupMqtt()
+void RingListener::setupMqtt(const QDateTime& now)
 {
 	const auto* mqttClient = &conn.mqtt;
 	connect(mqttClient, &QMqttClient::connected, this, &RingListener::onMqttConnected);
 	connect(mqttClient, &QMqttClient::messageReceived, this, &RingListener::onMessageReceived);
 	connect(mqttClient, &QMqttClient::disconnected, this, &RingListener::onMqttDisconnected);
 
-	conn.tsLastConnStateChange = QDateTime::currentDateTime();
+	conn.tsLastConnStateChange = now;
+	conn.tsLastActivity = now;
 	mqttConnect();
 }
 
-void RingListener::setupMainLoop()
+void RingListener::setupMainLoop(const QDateTime& now)
 {
 	// Use a timer and not SingleShot, as SingleShot seems not to be robust across restarts.
 	connect(&mainLoop.timer, &QTimer::timeout, this, &RingListener::runMainLoop);
-	mainLoop.tsLastRun = QDateTime::currentDateTime();
+
+	mainLoop.tsLastRun = now;
 	mainLoop.timer.setInterval(MainLoopCycle);
 	mainLoop.timer.start();
 }
@@ -70,7 +73,7 @@ void RingListener::mainLoopHandleConnection(const QDateTime& now)
 		if (conn.tsLastActivity.msecsTo(now) > ReconnectDelay)
 			establishConnectionToDevice();
 	}
-	else if (conn.tsLastActivity.msecsTo(now) > ActivityRefresh)
+	else if (conn.state == Connection::DeviceConnected && conn.tsLastActivity.msecsTo(now) > ActivityRefresh)
 	{
 		conn.tsLastActivity = now;
 		sendCommand(Command::ping);
@@ -286,9 +289,15 @@ bool RingListener::checkForWifi()
 {
 	const auto wlanSsid = getWlanSsid();
 
+	const auto setWifiDisconnected = [this](const QString& reason)
+	{
+		const QString& additionalReason = ", last check at: " + QDateTime::currentDateTime().toString(DateFormat);
+		setMqttDisconnected(reason + additionalReason);
+	};
+
 	if (wlanSsid.isEmpty())
 	{
-		setMqttDisconnected("No WiFi connection found!");
+		setWifiDisconnected("No WiFi connection found!");
 		return false;
 	}
 
@@ -296,7 +305,7 @@ bool RingListener::checkForWifi()
 	QRegularExpression ssidPattern("^" + conn.currentWifiPattern + "$");
 	if (!ssidPattern.match(wlanSsid).hasMatch())
 	{
-		setMqttDisconnected("WiFi SSID (\"" + wlanSsid + "\") does not match pattern (\"" + conn.currentWifiPattern + "\")");
+		setWifiDisconnected("WiFi SSID (\"" + wlanSsid + "\") does not match pattern (\"" + conn.currentWifiPattern + "\")");
 		return false;
 	}
 

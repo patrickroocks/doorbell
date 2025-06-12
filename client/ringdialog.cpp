@@ -116,8 +116,8 @@ void RingDialog::placeTopRight()
 	// Disable Wayland, cf. readme.md
 	QScreen * screen = QGuiApplication::primaryScreen();
 	QRect screenGeometry = screen->geometry();
-	int x = screenGeometry.topRight().x() - this->width();
-	int y = screenGeometry.topRight().y();
+	const int x = screenGeometry.topRight().x() - this->width();
+	const int y = screenGeometry.topRight().y();
 	this->setGeometry(x, y, this->width(), this->height());
 }
 

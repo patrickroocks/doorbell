@@ -43,10 +43,10 @@ private:
 	void mainLoopHandleConnection(const QDateTime& now);
 	void mainLoopHandleCommands(const QDateTime& now);
 
-	void setupMqtt();
+	void setupMqtt(const QDateTime& now);
 	void setupTray();
 	void setupDialog();
-	void setupMainLoop();
+	void setupMainLoop(const QDateTime& now);
 
 	enum class ResponseKind
 	{

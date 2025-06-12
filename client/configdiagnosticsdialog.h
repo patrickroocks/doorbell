@@ -48,12 +48,14 @@ protected:
 	void accept() override;
 
 	void onReceiveCommandResponse(const Command& cmd, const QByteArray& response) override;
+	void showEvent(QShowEvent* event) override;
 
 private slots:
 	void onCategoryChange(const QItemSelection& selected, const QItemSelection& deselected);
 
 private:
 	void prepareAboutWidget();
+	void placeCenter();
 	void loadSettings(const Config& config);
 	void applySettings();
 	void restoreDefaults();
