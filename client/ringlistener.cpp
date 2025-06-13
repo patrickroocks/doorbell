@@ -330,13 +330,13 @@ void RingListener::mqttConnect()
 {
 	conn.connStateDetails = "Connecting to MQTT broker...";
 	conn.state = Connection::Disconnected;
+	conn.tsLastActivity = QDateTime::currentDateTime();
 	updateConnState();
 
 	if (!checkForWifi())
 		return;
 
 	conn.currentBrokerAddr = cfgStore->getCurrentConfig().brokerAddr;
-	conn.tsLastActivity = QDateTime::currentDateTime();
 	conn.mqtt.setHostname(conn.currentBrokerAddr);
 	conn.mqtt.setPort(1883);
 	conn.mqtt.setClientId("DoorbellClient");
