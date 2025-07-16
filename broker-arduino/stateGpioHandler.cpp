@@ -162,6 +162,7 @@ void StateGpioHandler::setAutoBuzzState(bool newAutoBuzzState)
     if (newAutoBuzzState == autoBuzz) return;
     autoBuzz = newAutoBuzzState;
     mqttHandler->writeAutoBuzzStateToLogAndMqtt(newAutoBuzzState);
+    writeEeprom();
 }
 
 bool StateGpioHandler::getAutoBuzzState() const
