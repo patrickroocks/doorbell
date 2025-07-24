@@ -5,3 +5,4 @@ arduinoSecrets.h
 /broker-arduino/.vscode/*
 /project-doc/
 /client-release
+/client-win-build
