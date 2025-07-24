@@ -269,9 +269,28 @@ void RingListener::onMessageReceived(const QByteArray& message, const QMqttTopic
 QString RingListener::getWlanSsid() const
 {
 	QProcess process;
-	process.start("iwgetid", {"-r"});
+	
+	#ifdef Q_OS_LINUX
+		process.start("iwgetid", {"-r"});
+	#elif defined(Q_OS_WIN)
+		process.start("netsh", {"wlan", "show", "interfaces"});
+	#endif
+	
 	process.waitForFinished(1000);
-	return process.readAllStandardOutput().trimmed();
+	QString output = process.readAllStandardOutput();
+
+	#ifdef Q_OS_WIN
+	// Extrahiere SSID aus der netsh-Ausgabe
+	QRegularExpression re(R"(^\s*SSID\s*:\s*(.+)$)", QRegularExpression::MultilineOption);
+	QRegularExpressionMatch match = re.match(output);
+	if (match.hasMatch()) {
+		return match.captured(1).trimmed();
+	} else {
+		return "SSID not found";
+	}
+	#else
+	return output.trimmed();
+	#endif
 }
 
 void RingListener::setMqttDisconnected(const QString& reason)

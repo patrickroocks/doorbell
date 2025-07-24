@@ -93,7 +93,24 @@ void RingDialog::closeDialog()
 	emit dialogClosed();
 }
 
-void RingDialog::playWav() { wavPlayProcess.start("aplay", {ringApp->getWavPath()}); }
+void RingDialog::playWav()
+{
+	#ifdef Q_OS_LINUX
+		wavPlayProcess.start("aplay", { ringApp->getWavPath() });
+
+	#elif defined(Q_OS_WIN)
+		QString command = QStringLiteral(
+			"Add-Type -AssemblyName presentationCore;"
+			"[System.Media.SoundPlayer]::new('%1').PlaySync();"
+		).arg(ringApp->getWavPath().replace("'", "''"));
+
+		QProcess::startDetached("powershell", {
+			"-Command", command
+		});
+
+	#endif
+}
+
 
 void RingDialog::okOrOpen()
 {
