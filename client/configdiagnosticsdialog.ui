@@ -360,6 +360,52 @@
      </rect>
     </property>
    </widget>
+   <widget class="QLabel" name="label_9">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>72</y>
+      <width>171</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>MQTT Client ID:</string>
+    </property>
+   </widget>
+   <widget class="QLineEdit" name="txtMqttClientID">
+    <property name="geometry">
+     <rect>
+      <x>180</x>
+      <y>70</y>
+      <width>231</width>
+      <height>25</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLabel" name="lblAbout_2">
+    <property name="geometry">
+     <rect>
+      <x>180</x>
+      <y>100</y>
+      <width>681</width>
+      <height>31</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">background-color: rgb(211, 215, 207);
+border: 1px solid black;</string>
+    </property>
+    <property name="text">
+     <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;strong&gt;Note:&lt;/strong&gt; The client ID must be disjoint for the different clients connecting to the broker.&lt;/body&gt;&lt;/html&gt;</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignTop</set>
+    </property>
+    <property name="openExternalLinks">
+     <bool>true</bool>
+    </property>
+   </widget>
   </widget>
   <widget class="QWidget" name="wdgActionLog" native="true">
    <property name="geometry">
@@ -448,7 +494,7 @@
 border: 1px solid black;</string>
     </property>
     <property name="text">
-     <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:14pt; font-weight:600; color:#4e9a06;&quot;&gt;doorbell-client&lt;/span&gt;&lt;/p&gt;&lt;p&gt;Connection to the house intercom via the doorbell-broker (Arduino)&lt;br/&gt;&lt;/p&gt;&lt;p&gt;Version: %1&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;https://github.com/patrickroocks/doorbell&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;doorbell on GitHub&lt;/span&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;https://github.com/patrickroocks/doorbell&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;doorbell&lt;/span&gt;&lt;/a&gt;&lt;a href=&quot;https://www.p-roocks.de/wordpress2/software/doorbell/&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt; on my personal web page&lt;/span&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;Copyright 2025 by Patrick Roocks (&lt;a href=&quot;mailto:mail@p-roocks.de&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;mail@p-roocks.de&lt;/span&gt;&lt;/a&gt;)&lt;/p&gt;&lt;p&gt;License: MIT License&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:14pt; font-weight:600; color:#4e9a06;&quot;&gt;doorbell-client&lt;/span&gt;&lt;/p&gt;&lt;p&gt;Connection to the house intercom via the doorbell-broker (Arduino)&lt;br/&gt;&lt;/p&gt;&lt;p&gt;Version: %1&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;https://github.com/patrickroocks/doorbell&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;doorbell on GitHub&lt;/span&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;https://github.com/patrickroocks/doorbell&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;doorbell&lt;/span&gt;&lt;/a&gt;&lt;a href=&quot;https://www.p-roocks.de/wordpress2/software/doorbell/&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt; on my personal web page&lt;/span&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;Copyright 2026 by Patrick Roocks (&lt;a href=&quot;mailto:mail@p-roocks.de&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;mail@p-roocks.de&lt;/span&gt;&lt;/a&gt;)&lt;/p&gt;&lt;p&gt;License: MIT License&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
     </property>
     <property name="alignment">
      <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignTop</set>

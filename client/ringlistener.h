@@ -1,6 +1,7 @@
 #pragma once
 
 #include "command.h"
+#include "config.h"
 
 #include <QAction>
 #include <QApplication>
@@ -11,8 +12,8 @@
 #include <QTimer>
 
 class ConfigDiagnosticsDialog;
-class ConfigsSettingsDialog;
 class ConfigStore;
+class ConfigsSettingsDialog;
 class RingApp;
 class RingDialog;
 
@@ -59,8 +60,9 @@ private:
 	void onMqttConnected();
 	void onMqttDisconnected();
 	void onMessageReceived(const QByteArray& message, const QMqttTopicName& topic);
-	void handleCommandResponse(const Command& cmd, ResponseKind responseKind, const QByteArray& response = {});
-	void handleInternalStateByResponse(const Command& cmd, ResponseKind responseKind, const QByteArray& response);
+	void handleCommandResponse(ResponseKind responseKind, const QByteArray& response = {});
+	bool consumeAndForwardMultiResponse(ResponseKind responseKind, const QByteArray& response);
+	void handleInternalStateByResponse(ResponseKind responseKind, const QByteArray& response);
 	void mqttConnect();
 	void establishConnectionToDevice();
 
@@ -109,8 +111,7 @@ private:
 
 		State state;
 		QMqttClient mqtt;
-		QString currentWifiPattern;
-		QString currentBrokerAddr;
+		Config currentConfig;
 		QString connStateDetails;
 		QDateTime tsLastActivity;
 		QDateTime tsLastConnStateChange;

@@ -17,6 +17,7 @@ public:
 
     // Waiting / system state from external
     void loopWaitCycle();
+    void initLedsAfterStartUp();
     void waitSeconds(int sec);
     void reboot();
 

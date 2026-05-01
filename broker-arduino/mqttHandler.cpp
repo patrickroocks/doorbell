@@ -1,6 +1,7 @@
 #include "mqttHandler.h"
 
 #include "app.h"
+#include "arduinoSecrets.h"
 #include "networkHandler.h"
 #include "stateGpioHandler.h"
 
@@ -26,10 +27,12 @@ const char* CmdTestRing = "testRing";
 const char* CmdPing = "ping";
 const char* CmdAckRing = "ackRing";
 const char* CmdRawData = "getRawData";
+const char* CmdReboot = "reboot";
 
 // Messages
 const char* MsgRing = "ring";
 const char* MsgAckRing = "ackRing";
+const char* MsgAckReboot = "ackReboot";
 const char* MsgTestRing = "testRing";
 const char* MsgAutoBuzzOn = "autoBuzzOn";
 const char* MsgAutoBuzzOff = "autoBuzzOff";
@@ -37,26 +40,63 @@ const char* MsgPong = "pong";
 const char* MsgBuzzAck = "buzzAck";
 const char* MsgEndMultiResponse = "endMultiResponse";
 
+// Connection
+const int connectionTriesPerConfig = 3;
+
 MqttHandler::MqttHandler(App* app)
     : app(app)
-    , broker(MqttBrokerPort)
     , espClient()
     , client(espClient)
 {}
 
 void MqttHandler::reconnectMqttClient()
 {
-    while (!client.connected()) {
+    pickNextMqttConfigStartBrokerIfNeeded();
+    tryToConnectToCurrentConfig();
+}
+
+void MqttHandler::pickNextMqttConfigStartBrokerIfNeeded()
+{
+    if (currentMqttConfig.brokerAddress == "localhost") {
+        // We are currently running a local broker, stop it before switching configs
+        broker->stopBroker();
+    }
+
+    ++currentMqttConfigIndex;
+    auto mqttConfigs = getMqttConfigs();
+    if (currentMqttConfigIndex == mqttConfigs.size()) {
+        currentMqttConfigIndex = 0;
+    }
+    Serial.print("Trying MQTT config: ");
+    Serial.print(mqttConfigs.at(currentMqttConfigIndex).brokerAddress);
+    Serial.print(":");
+    Serial.println(mqttConfigs.at(currentMqttConfigIndex).brokerPort);
+
+    currentMqttConfig = mqttConfigs.at(currentMqttConfigIndex);
+    client.setServer(currentMqttConfig.brokerAddress.c_str(), currentMqttConfig.brokerPort);
+
+    if (currentMqttConfig.brokerAddress == "localhost") {
+        setupMqttBroker();
+    }
+}
+
+void MqttHandler::tryToConnectToCurrentConfig()
+{
+    int currentConnectionTries = 0;
+
+    while (!client.connected() && currentConnectionTries < connectionTriesPerConfig) {
         Serial.print("[MQTT] Connect...");
         if (client.connect("DoorbellBrokerESP32")) {
             Serial.println("[MQTT] connected");
             client.subscribe(CommandTopic);
             Serial.print("[MQTT] subscribed to topic: ");
             Serial.println(CommandTopic);
+            break;
         } else {
             Serial.print("[MQTT] error, rc=");
             Serial.println(client.state());
             stateGpioHandler->waitSeconds(3);
+            ++currentConnectionTries;
         }
     }
 }
@@ -65,15 +105,15 @@ void MqttHandler::setupMqttBroker()
 {
     // Start the mqtt broker.
     // Does not need anything in the "loop" part!
-    broker.setMaxNumClients(9); // set according to your system.
-    broker.startBroker();
+    if (!broker) broker = MqttBrokerFactory::createTcpBroker(MqttBrokerPort);
+    broker->setMaxNumClients(9); // set according to your system.
+    broker->startBroker();
     Serial.println("MQTT broker started");
 }
 
 void MqttHandler::setupMqttClient()
 {
     client.setBufferSize(1024);
-    client.setServer(MqttServerAddr, 1883);
     client.setCallback([this](char* topic, byte* payload, unsigned int length) { callbackMqtt(topic, payload, length); });
     Serial.println("MQTT Client started.");
 }
@@ -90,7 +130,6 @@ void MqttHandler::setup()
         networkHandler->setRequestLogWhenValidTime();
     }
 
-    setupMqttBroker();
     setupMqttClient();
 }
 
@@ -100,7 +139,7 @@ void MqttHandler::loop()
     if (!client.connected()) {
         if (mqttConnected) {
             mqttConnected = false;
-            // We were alread connected: MQTT Server probably crashed, reboot the Arduino
+            // We were alread connected: MQTT Server probably crashed or Raspi is gone, reboot the Arduino
             Serial.println("MQTT connection lost, reboot...");
             stateGpioHandler->reboot();
             return;
@@ -108,6 +147,7 @@ void MqttHandler::loop()
         reconnectMqttClient();
     } else {
         mqttConnected = true;
+        stateGpioHandler->initLedsAfterStartUp();
         client.loop();
     }
 }
@@ -141,6 +181,9 @@ void MqttHandler::callbackMqtt(char* topic, byte* payload, unsigned int length)
             showRawData();
         } else if (payloadStr == CmdGetStartTime) {
             client.publish(ResponseTopic, startTime.c_str());
+        } else if (payloadStr == CmdReboot) {
+            client.publish(ResponseTopic, MsgAckReboot);
+            stateGpioHandler->reboot();
         } else {
             Serial.print("[MQTT] received unknown command: ");
             Serial.println(payloadStr);

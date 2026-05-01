@@ -1,6 +1,7 @@
 #pragma once
 
 #include "circularArray.h"
+#include "configStructs.h"
 
 #include <Arduino.h>
 #include <EmbeddedMqttBroker.h>
@@ -19,7 +20,6 @@ public:
 
     void loop();
     void setup();
-    void reconnectMqttClient();
 
     void writeRingToMqttAndLog(bool testRing);
     void writeBuzzToLog(bool autoBuzz);
@@ -32,6 +32,10 @@ private:
     void setupMqttBroker();
     void setupMqttClient();
 
+    void reconnectMqttClient();
+    void pickNextMqttConfigStartBrokerIfNeeded();
+    void tryToConnectToCurrentConfig();
+
     void callbackMqtt(char* topic, byte* payload, unsigned int length);
     void showActionLog();
     void showRawData();
@@ -42,11 +46,13 @@ private:
     NetworkHandler* networkHandler = nullptr;
 
     // MQTT stack
-    mqttBrokerName::MqttBroker broker;
+    mqttBrokerName::MqttBroker* broker = nullptr;
     WiFiClient espClient;
     PubSubClient client;
 
     // State
+    MqttClientConfig currentMqttConfig;
+    int currentMqttConfigIndex = -1;
     bool mqttConnected = false;
     CircularArray<String, ActionLogSize> actionLog;
     String startTime;

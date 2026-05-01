@@ -25,6 +25,7 @@ RingListener::RingListener(RingApp* ringApp)
 	: ringApp(ringApp)
 	, cfgStore(ringApp->getConfigStore())
 {
+	conn.currentConfig = cfgStore->getCurrentConfig();
 	const auto now = QDateTime::currentDateTime();
 	setupMqtt(now);
 	setupTray();
@@ -71,7 +72,8 @@ void RingListener::mainLoopHandleConnection(const QDateTime& now)
 	else if (conn.state == Connection::MqttConnected)
 	{
 		if (conn.tsLastActivity.msecsTo(now) > ReconnectDelay)
-			establishConnectionToDevice();
+			// After a timeout in the connection phase, reconnect entirely
+			reconnect();
 	}
 	else if (conn.state == Connection::DeviceConnected && conn.tsLastActivity.msecsTo(now) > ActivityRefresh)
 	{
@@ -106,12 +108,12 @@ void RingListener::mainLoopHandleCommands(const QDateTime& now)
 		}
 		else
 		{
-			handleCommandResponse(cmdState.cmdSent, ResponseKind::NotConnected);
+			handleCommandResponse(ResponseKind::NotConnected);
 		}
 	}
 	else if (cmdState.sendRecState == CommandState::WaitForResponse && cmdState.tsCommandSent.msecsTo(now) >= CommandTimeout)
 	{
-		handleCommandResponse(cmdState.cmdSent, ResponseKind::Timeout);
+		handleCommandResponse(ResponseKind::Timeout);
 	}
 }
 
@@ -136,6 +138,7 @@ void RingListener::setupTray()
 	tray.autoBuzzToggle->setCheckable(true);
 	connect(tray.autoBuzzToggle.get(),
 			&QAction::triggered,
+			this,
 			[this]()
 			{
 				// Qt framework gives us the new state
@@ -155,6 +158,7 @@ void RingListener::setupTray()
 	tray.cfgDiagAction.reset(new QAction("Config && Diagnostics", &tray.menu));
 	connect(tray.cfgDiagAction.get(),
 			&QAction::triggered,
+			this,
 			[this]()
 			{
 				cfgDiagDlg->show();
@@ -262,7 +266,7 @@ void RingListener::onMessageReceived(const QByteArray& message, const QMqttTopic
 	}
 	else if (topic.name() == ResponseTopic)
 	{
-		handleCommandResponse(cmdState.cmdSent, ResponseKind::Normal, message);
+		handleCommandResponse(ResponseKind::Normal, message);
 	}
 }
 
@@ -275,22 +279,25 @@ QString RingListener::getWlanSsid() const
 	#elif defined(Q_OS_WIN)
 		process.start("netsh", {"wlan", "show", "interfaces"});
 	#endif
-	
-	process.waitForFinished(1000);
-	QString output = process.readAllStandardOutput();
 
-	#ifdef Q_OS_WIN
-	// Extrahiere SSID aus der netsh-Ausgabe
-	QRegularExpression re(R"(^\s*SSID\s*:\s*(.+)$)", QRegularExpression::MultilineOption);
-	QRegularExpressionMatch match = re.match(output);
-	if (match.hasMatch()) {
-		return match.captured(1).trimmed();
-	} else {
-		return "SSID not found";
-	}
-	#else
-	return output.trimmed();
-	#endif
+		process.waitForFinished(1000);
+		QString output = process.readAllStandardOutput();
+
+#ifdef Q_OS_WIN
+		// Extract SSID from the netsh output
+		QRegularExpression re(R"(^\s*SSID\s*:\s*(.+)$)", QRegularExpression::MultilineOption);
+		QRegularExpressionMatch match = re.match(output);
+		if (match.hasMatch())
+		{
+			return match.captured(1).trimmed();
+		}
+		else
+		{
+			return "SSID not found";
+		}
+#else
+		return output.trimmed();
+#endif
 }
 
 void RingListener::setMqttDisconnected(const QString& reason)
@@ -320,11 +327,10 @@ bool RingListener::checkForWifi()
 		return false;
 	}
 
-	conn.currentWifiPattern = cfgStore->getCurrentConfig().wlanPattern;
-	QRegularExpression ssidPattern("^" + conn.currentWifiPattern + "$");
+	QRegularExpression ssidPattern("^" + conn.currentConfig.wlanPattern + "$");
 	if (!ssidPattern.match(wlanSsid).hasMatch())
 	{
-		setWifiDisconnected("WiFi SSID (\"" + wlanSsid + "\") does not match pattern (\"" + conn.currentWifiPattern + "\")");
+		setWifiDisconnected("WiFi SSID (\"" + wlanSsid + "\") does not match pattern (\"" + conn.currentConfig.wlanPattern + "\")");
 		return false;
 	}
 
@@ -355,10 +361,9 @@ void RingListener::mqttConnect()
 	if (!checkForWifi())
 		return;
 
-	conn.currentBrokerAddr = cfgStore->getCurrentConfig().brokerAddr;
-	conn.mqtt.setHostname(conn.currentBrokerAddr);
+	conn.mqtt.setHostname(conn.currentConfig.brokerAddr);
 	conn.mqtt.setPort(1883);
-	conn.mqtt.setClientId("DoorbellClient");
+	conn.mqtt.setClientId(cfgStore->getCurrentConfig().mqttClientID);
 	conn.mqtt.connectToHost();
 }
 
@@ -394,7 +399,7 @@ void RingListener::establishConnectionToDevice()
 void RingListener::onMqttDisconnected()
 {
 	qDebug() << "Disconnected from MQTT broker";
-	setMqttDisconnected(QString("No connection to broker (") + conn.currentBrokerAddr + ")");
+	setMqttDisconnected(QString("No connection to broker (") + conn.currentConfig.brokerAddr + ")");
 }
 
 QString RingListener::getConnStateStr() const
@@ -424,16 +429,14 @@ bool RingListener::getAutoBuzzState() const { return tray.autoBuzzToggle->isChec
 
 void RingListener::sendCommand(const Command& command) { cmdState.queue.append(command); }
 
-void RingListener::handleCommandResponse(const Command& cmd, ResponseKind responseKind, const QByteArray& response)
+bool RingListener::consumeAndForwardMultiResponse(ResponseKind responseKind, const QByteArray& response)
 {
-	handleInternalStateByResponse(cmd, responseKind, response);
-
 	// Handle non-timeout multi-responses.
-	if (cmd.isMultiResponse() && responseKind == ResponseKind::Normal)
+	if (cmdState.cmdSent.answeredByMultiResponse() && responseKind == ResponseKind::Normal)
 	{
 		if (response == SpecialResponse::EndMultiResponse)
 		{
-			emit receiveCommandResponse(cmd, cmdState.multiResponse);
+			emit receiveCommandResponse(cmdState.cmdSent, cmdState.multiResponse);
 			cmdState.multiResponse.clear();
 			cmdState.sendRecState = CommandState::Idle;
 		}
@@ -446,8 +449,20 @@ void RingListener::handleCommandResponse(const Command& cmd, ResponseKind respon
 
 			cmdState.multiResponse += response;
 		}
-		return;
+		return true;
 	}
+	else
+	{
+		return false;
+	}
+}
+
+void RingListener::handleCommandResponse(ResponseKind responseKind, const QByteArray& response)
+{
+	handleInternalStateByResponse(responseKind, response);
+
+	if (consumeAndForwardMultiResponse(responseKind, response))
+		return;
 
 	cmdState.sendRecState = CommandState::Idle;
 
@@ -455,27 +470,31 @@ void RingListener::handleCommandResponse(const Command& cmd, ResponseKind respon
 	switch (responseKind)
 	{
 	case ResponseKind::Normal:
-		emit receiveCommandResponse(cmd, response);
+		emit receiveCommandResponse(cmdState.cmdSent, response);
 		break;
 	case ResponseKind::Timeout:
-		emit receiveCommandResponse(cmd, "[Timeout while sending command '" + cmd.toByteArray() + "']");
+		emit receiveCommandResponse(cmdState.cmdSent, "[Timeout while sending command '" + cmdState.cmdSent.toByteArray() + "']");
 		break;
 	case ResponseKind::NotConnected:
-		emit receiveCommandResponse(cmd, "[Not connected]");
+		emit receiveCommandResponse(cmdState.cmdSent, "[Not connected]");
 		break;
 	}
 }
 
-void RingListener::handleInternalStateByResponse(const Command& cmd, ResponseKind responseKind, const QByteArray& response)
+void RingListener::handleInternalStateByResponse(ResponseKind responseKind, const QByteArray& response)
 {
 	const auto now = QDateTime::currentDateTime();
+
+	// Check if the connection to the device is lost (timeout for ANY command).
+	// Do not complain about a different answer to ping, this could come from other connected clients!
+	const bool timeout = responseKind == ResponseKind::Timeout;
 
 	if (responseKind == ResponseKind::Normal)
 	{
 		conn.tsLastActivity = now;
 
 		// Check for auto buzzer response
-		if (cmd == Command::getAutoBuzz)
+		if (cmdState.cmdSent == Command::getAutoBuzz)
 		{
 			if (response == SpecialResponse::AutoBuzzOn)
 				setNewAutoBuzzState(true);
@@ -483,28 +502,21 @@ void RingListener::handleInternalStateByResponse(const Command& cmd, ResponseKin
 				setNewAutoBuzzState(false);
 		}
 
-		// Check if a connection is established (ping -> pong).
-		if (cmd == Command::ping && response == SpecialResponse::Pong)
+		// Check if a connection is established now (ping -> pong).
+		// Ask for current AutoBuzz state in this case.
+		const bool pongResponseToPing = (cmdState.cmdSent == Command::ping && response == SpecialResponse::Pong);
+		const bool alreadyConnected = (conn.state == Connection::DeviceConnected);
+		if (pongResponseToPing && !alreadyConnected)
 		{
-			const bool establishedConnectionNow = (conn.state == Connection::MqttConnected);
-
-			if (establishedConnectionNow)
-			{
-				conn.state = Connection::DeviceConnected;
-				emit autoBuzzStateChanged(getAutoBuzzStateStr());
-				conn.tsLastConnStateChange = now;
-				conn.connStateDetails = "";
-				sendCommand(Command::getAutoBuzz);
-				updateConnState();
-			}
+			conn.state = Connection::DeviceConnected;
+			emit autoBuzzStateChanged(getAutoBuzzStateStr());
+			conn.tsLastConnStateChange = now;
+			conn.connStateDetails = "";
+			sendCommand(Command::getAutoBuzz);
+			updateConnState();
 		}
 	}
-
-	// Check if the connection to the device is lost (timeout for ANY command or unexpected response to ping).
-	const bool timeout = responseKind == ResponseKind::Timeout;
-	const bool pingWithoutPong = (cmd == Command::ping && response != SpecialResponse::Pong);
-
-	if (timeout || pingWithoutPong)
+	else if (timeout)
 	{
 		if (timeout)
 			conn.connStateDetails = "Connected to MQTT broker, device not responding";
@@ -516,19 +528,15 @@ void RingListener::handleInternalStateByResponse(const Command& cmd, ResponseKin
 
 		if (conn.state == Connection::DeviceConnected)
 		{
-			conn.state = Connection::MqttConnected;
-			conn.tsLastConnStateChange = QDateTime::currentDateTime();
-			emit autoBuzzStateChanged(getAutoBuzzStateStr());
-			updateConnState();
+			// After a command timeout, reconnect entirely
+			reconnect();
 		}
 	}
 }
 
 void RingListener::reloadSettings()
 {
-	const auto newConfig = cfgStore->getCurrentConfig();
-
-	if (newConfig.brokerAddr != conn.currentBrokerAddr || newConfig.wlanPattern != conn.currentWifiPattern)
+	if (cfgStore->getCurrentConfig() != conn.currentConfig)
 	{
 		conn.mqtt.disconnectFromHost();
 		mqttConnect();

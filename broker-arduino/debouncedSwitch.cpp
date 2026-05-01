@@ -24,7 +24,12 @@ bool DebouncedSwitch::checkRaise()
     return raise;
 }
 
-void DebouncedSwitch::collectRawData(bool isPressed)
+bool DebouncedSwitch::isCurrentlyPressed() const
+{
+    return isPressed;
+}
+
+void DebouncedSwitch::collectRawData()
 {
     if (!rawDataLoggingEnabled) return;
 
@@ -59,9 +64,9 @@ String DebouncedSwitch::getRawDataStr() const
 void DebouncedSwitch::readState()
 {
     // All switches/inputs are grounded, so HIGH means not pressed.
-    bool isPressed = digitalRead(pin) == LOW;
+    isPressed = digitalRead(pin) == LOW;
 
-    collectRawData(isPressed);
+    collectRawData();
 
     if (isPressed != lastState) {
         debounceCounter++;

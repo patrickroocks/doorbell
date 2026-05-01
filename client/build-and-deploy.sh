@@ -27,7 +27,16 @@ echo "Copy new client to relase directory and start it..."
 mkdir -p ../client-release
 cp build/doorbell-client ../client-release/doorbell-client
 
-# Run it
-../client-release/doorbell-client > /dev/null 2>&1 & disown
+# Write the command to a script file
+mkdir -p ../client-release
+cat << 'EOF' > ../client-release/run-doorbell-client.sh
+#!/bin/bash
+cd "$(dirname "$0")"
+./doorbell-client > /dev/null 2>&1 & disown
+EOF
+chmod +x ../client-release/run-doorbell-client.sh
+
+# Execute the script
+../client-release/run-doorbell-client.sh
 
 echo "New doorbell client build and started."

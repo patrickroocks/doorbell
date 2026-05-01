@@ -69,7 +69,8 @@ void StateGpioHandler::loopWaitCycle()
     // loop blink (shows that we didn't stuck)
     digitalWrite(LED_BUILTIN, blinkState);
 
-    // write LOW to all LEDS, except the ledSeq LED:
+    // LED startup sequence:
+    // Write LOW to all LEDS, except the ledSeq LED:
     for (uint8_t i = FirstLed; i <= LastLed; ++i) {
         digitalWrite(i, i == ledSeq ? HIGH : LOW);
     }
@@ -200,23 +201,27 @@ void StateGpioHandler::ackRingAndBuzzButton()
     }
 }
 
-
-void StateGpioHandler::writeLedsInNormalLoop()
+void StateGpioHandler::initLedsAfterStartUp()
 {
     digitalWrite(LED_BUILTIN, HIGH);
     digitalWrite(LedOn, HIGH);
+    digitalWrite(Led3Unused, LOW);
+    writeLedsInNormalLoop();
+}
+
+void StateGpioHandler::writeLedsInNormalLoop()
+{
     if (timerAckLedOn.check()) {
         digitalWrite(LedAckAutobuzz, HIGH);
     } else {
-        digitalWrite(LedAckAutobuzz, autoBuzz ? blinkState : LOW);
+        digitalWrite(LedAckAutobuzz, autoBuzz ? HIGH : LOW);
     }
     if (wantToReboot) {
         digitalWrite(LedError, blinkState);
     } else {
         digitalWrite(LedError, timerErrorLedOn.check() ? HIGH : LOW);
     }
-    // Blick in opposite state of the auto buzzer LED
-    digitalWrite(LedDoorbell, timerBellBlink.check() ? !blinkState : static_cast<uint8_t>(ringActive));
+    digitalWrite(LedDoorbell, timerBellBlink.check() ? blinkState : static_cast<uint8_t>(ringActive));
 }
 
 void StateGpioHandler::readSwitches()
@@ -231,6 +236,11 @@ void StateGpioHandler::readSwitches()
 
     if (switchAck.checkRaise()) {
         ackRingButton();
+    }
+
+    // Reboot if all 3 buttons are pressed at the same time.
+    if (switchBuzzMode.isCurrentlyPressed() && switchAckBuzz.isCurrentlyPressed() && switchAck.isCurrentlyPressed()) {
+        reboot();
     }
 }
 

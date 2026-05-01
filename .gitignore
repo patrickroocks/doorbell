@@ -1,6 +1,7 @@
+arduinoSecrets.cpp
+secrets.inc.php
 /client/build/*
 /client/CMakeLists.txt.user
-arduinoSecrets.h
 /debug/*
 /broker-arduino/.vscode/*
 /project-doc/

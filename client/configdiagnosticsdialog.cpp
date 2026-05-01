@@ -44,9 +44,8 @@ ConfigDiagnosticsDialog::ConfigDiagnosticsDialog(RingListener* ringListener, Con
 	, ringListener(ringListener)
 	, ui(new Ui::ConfigDiagnosticsDialog)
 {
+	// This only executed once on applicaiton start
 	ui->setupUi(this);
-
-	loadSettings(cfgStore->getCurrentConfig());
 	subscribeToState();
 	initializeCategories();
 	establishUiConnections();
@@ -69,7 +68,7 @@ void ConfigDiagnosticsDialog::establishUiConnections()
 	connect(ui->cmdReconnectNow, &QPushButton::clicked, ringListener, &RingListener::reconnect);
 }
 
-void ConfigDiagnosticsDialog::restoreDefaults() { loadSettings(cfgStore->getDefaultConfig()); }
+void ConfigDiagnosticsDialog::restoreDefaults() { loadSettings(Config::getDefaultConfig()); }
 
 void ConfigDiagnosticsDialog::subscribeToState()
 {
@@ -161,13 +160,13 @@ void ConfigDiagnosticsDialog::onCategoryChange(const QItemSelection& selected, c
 {
 	if (!deselected.isEmpty())
 	{
-		auto index = deselected.indexes().first();
+		const auto index = deselected.indexes().first();
 		categories[index.row()].widget->setVisible(false);
 	}
 
 	if (!selected.isEmpty())
 	{
-		auto index = selected.indexes().first();
+		const auto index = selected.indexes().first();
 		auto& selectedCategory = categories[index.row()];
 		selectedCategory.widget->setVisible(true);
 		updateSelectedCategory();
@@ -176,6 +175,8 @@ void ConfigDiagnosticsDialog::onCategoryChange(const QItemSelection& selected, c
 
 void ConfigDiagnosticsDialog::updateSelectedCategory()
 {
+	// This is executed each time when the dialog is shown
+
 	auto& selectedCategory = categories[ui->lstCategory->currentIndex().row()];
 
 	if (selectedCategory.widget == ui->wdgMainState)
@@ -184,6 +185,8 @@ void ConfigDiagnosticsDialog::updateSelectedCategory()
 		updateActionLog();
 	else if (selectedCategory.widget == ui->wdgRawData)
 		updateRawData();
+	else if (selectedCategory.widget == ui->wdgSettings)
+		loadSettings(cfgStore->getCurrentConfig());
 }
 
 void ConfigDiagnosticsDialog::updateRawData()
@@ -217,8 +220,9 @@ void ConfigDiagnosticsDialog::accept()
 
 void ConfigDiagnosticsDialog::applySettings()
 {
-	cfgStore->setBrokerAddr(ui->txtBrokerAddr->text());
-	cfgStore->setWlanPattern(ui->txtWlanPattern->text());
+	cfgStore->setNewConfig(Config{.wlanPattern = ui->txtWlanPattern->text(),
+								  .brokerAddr = ui->txtBrokerAddr->text(),
+								  .mqttClientID = ui->txtMqttClientID->text()});
 	ringListener->reloadSettings();
 }
 
@@ -242,6 +246,7 @@ void ConfigDiagnosticsDialog::loadSettings(const Config& config)
 {
 	ui->txtBrokerAddr->setText(config.brokerAddr);
 	ui->txtWlanPattern->setText(config.wlanPattern);
+	ui->txtMqttClientID->setText(config.mqttClientID);
 }
 
 void ConfigDiagnosticsDialog::testRing() { sendCommand(Command::testRing); }

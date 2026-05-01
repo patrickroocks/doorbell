@@ -6,7 +6,7 @@
 class RingListener;
 class Command;
 
-// Interface for a class that can send commands and receive responses.
+// Common baseclass for classes that can send commands and receive responses.
 class CommandClientDialog : public QDialog
 {
 	Q_OBJECT

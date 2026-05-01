@@ -42,7 +42,7 @@ void RingDialog::incrementRingCount(bool testRing, const QByteArray& additionalI
 
 	if (!testRing && !autoBuzzOn)
 	{
-		canOpen = true;
+		allowedToOpenDoor = true;
 		ui->cmdOkOrOpen->setText("Open house door");
 	}
 	else
@@ -85,7 +85,7 @@ void RingDialog::closeDialog()
 	sendCommand(Command::ackRing);
 	testRingCount = 0;
 	ringCount = 0;
-	canOpen = false;
+	allowedToOpenDoor = false;
 	additionalInfos.clear();
 	wavPlayTimer.stop();
 
@@ -114,7 +114,7 @@ void RingDialog::playWav()
 
 void RingDialog::okOrOpen()
 {
-	if (canOpen)
+	if (allowedToOpenDoor)
 	{
 		ui->lblMessage->setText(QString("Waiting for door buzzer..."));
 		waitForBuzzerAck = true;
@@ -131,14 +131,14 @@ RingDialog::~RingDialog() { delete ui; }
 void RingDialog::placeTopRight()
 {
 	// Disable Wayland, cf. readme.md
-	QScreen * screen = QGuiApplication::primaryScreen();
+	QScreen* screen = QGuiApplication::primaryScreen();
 	QRect screenGeometry = screen->geometry();
 	const int x = screenGeometry.topRight().x() - this->width();
 	const int y = screenGeometry.topRight().y();
 	this->setGeometry(x, y, this->width(), this->height());
 }
 
-void RingDialog::showEvent(QShowEvent * event) { placeTopRight(); }
+void RingDialog::showEvent(QShowEvent* event) { placeTopRight(); }
 
 void RingDialog::onReceiveCommandResponse(const Command& cmd, const QByteArray& response)
 {

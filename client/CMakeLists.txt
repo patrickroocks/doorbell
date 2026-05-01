@@ -22,6 +22,7 @@ add_executable(doorbell-client
 	resources.qrc
 	readme.md
 	constants.h
+	config.h config.cpp
 	configstore.h configstore.cpp
 	ringapp.h ringapp.cpp
 	configdiagnosticsdialog.h configdiagnosticsdialog.cpp configdiagnosticsdialog.ui

@@ -33,7 +33,7 @@ bool Command::needsResponse() const
 	}
 }
 
-bool Command::isMultiResponse() const
+bool Command::answeredByMultiResponse() const
 {
 	// only action log and raw data are multi-responses
 	return value == getActionLog || value == getRawData;

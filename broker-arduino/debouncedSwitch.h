@@ -17,12 +17,13 @@ public:
     void setup();
 
     bool checkRaise();
+    bool isCurrentlyPressed() const;
 
     const CircularArray<String, MaxRawDataStrings>& getArchivedRawDataStrings() const;
     String getCurrentRawDataStr() const;
 
 private:
-    void collectRawData(bool isPressed);
+    void collectRawData();
     String getRawDataStr() const;
     void readState();
 
@@ -33,6 +34,7 @@ private:
     const int pin;
     const int debounceCycles;
     const bool rawDataLoggingEnabled;
+    bool isPressed = false;
     bool lastState = false;
     bool lastDebounceState = false;
     int debounceCounter = 0;

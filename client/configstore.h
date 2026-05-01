@@ -1,36 +1,20 @@
 #pragma once
 
-#include <QtCore>
+#include "config.h"
 
 class RingApp;
-
-struct Config final
-{
-	QString wlanPattern;
-	QString brokerAddr;
-
-	void loadFromJson(const QJsonObject& obj);
-	QJsonObject toJson() const;
-};
 
 class ConfigStore final
 {
 public:
-	ConfigStore(RingApp* app);
-
-	const Config& getDefaultConfig() const { return defaultConfig; }
+	explicit ConfigStore(RingApp* app);
 	const Config& getCurrentConfig() const { return currentConfig; }
-
-	void setWlanPattern(const QString& pattern);
-	void setBrokerAddr(const QString& addr);
-
-	void saveToFile();
+	void setNewConfig(const Config& newConfig);
 
 private:
-	QJsonObject getConfigFromFile(const QString& filePath);
+	static QJsonObject getConfigFromFile(const QString& filePath);
+	void saveCurrentConfigToFile() const;
 
 	Config currentConfig;
-	const Config defaultConfig;
-
 	QString const configFilePath;
 };

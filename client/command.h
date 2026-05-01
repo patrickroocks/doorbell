@@ -25,7 +25,7 @@ public:
 	Q_ENUM_HELPERS(Command)
 
 	bool needsResponse() const;
-	bool isMultiResponse() const;
+	bool answeredByMultiResponse() const;
 };
 
 class SpecialResponse final

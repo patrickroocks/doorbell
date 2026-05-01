@@ -13,13 +13,12 @@ class RingDialog;
 class RingApp;
 class RingListener;
 
-class RingDialog : public CommandClientDialog
+class RingDialog final : public CommandClientDialog
 {
 	Q_OBJECT
 
 public:
 	explicit RingDialog(RingApp* app, RingListener* ringListener);
-	void closeEvent(QCloseEvent * event) override;
 	~RingDialog();
 
 	void incrementRingCount(bool testRing, const QByteArray& additionalInfo, bool autoBuzzOn);
@@ -29,7 +28,8 @@ signals:
 	void dialogClosed();
 
 protected:
-	void showEvent(QShowEvent * event) override;
+	void closeEvent(QCloseEvent* event) override;
+	void showEvent(QShowEvent* event) override;
 
 	virtual void onReceiveCommandResponse(const Command& cmd, const QByteArray& response) override;
 
@@ -38,13 +38,12 @@ private:
 	void placeTopRight();
 	void okOrOpen();
 
-	Ui::RingDialog * ui;
+	Ui::RingDialog* const ui;
 	RingApp* const ringApp;
 	QProcess wavPlayProcess;
 	QTimer wavPlayTimer;
 	QByteArray additionalInfos;
-
-	bool canOpen = false;
+	bool allowedToOpenDoor = false;
 	int ringCount = 0;
 	int testRingCount = 0;
 	bool waitForBuzzerAck = false;

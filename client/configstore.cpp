@@ -2,42 +2,15 @@
 
 #include "constants.h"
 #include "ringapp.h"
-#include "util.h"
-
-namespace {
-
-const QString WlanPatternKey = "wlanPattern";
-const QString BrokerAddrKey = "brokerAddr";
-
-const QString DefaultBrokerAddr = "localhost";
-const QString DefaultWlanPattern = ".*";
-}
-
-QJsonObject Config::toJson() const
-{
-	QJsonObject obj;
-	obj[WlanPatternKey] = wlanPattern;
-	obj[BrokerAddrKey] = brokerAddr;
-	return obj;
-}
-
-void Config::loadFromJson(const QJsonObject& obj)
-{
-	wlanPattern = util::getJsonStringWithDefault(obj, WlanPatternKey, DefaultWlanPattern);
-	brokerAddr = util::getJsonStringWithDefault(obj, BrokerAddrKey, DefaultBrokerAddr);
-}
-
-// ----------------------------------------------------------------------------
 
 ConfigStore::ConfigStore(RingApp* app)
-	: defaultConfig{Config{.wlanPattern = DefaultWlanPattern, .brokerAddr = DefaultBrokerAddr}}
-	, configFilePath(app->getExecDir() + ConfigFileName)
+	: configFilePath(app->getExecDir() + ConfigFileName)
 {
 	currentConfig.loadFromJson(getConfigFromFile(configFilePath));
-	saveToFile();
+	saveCurrentConfigToFile();
 }
 
-QJsonObject ConfigStore::getConfigFromFile(const QString & filePath)
+QJsonObject ConfigStore::getConfigFromFile(const QString& filePath)
 {
 	QFile file(filePath);
 	if (!file.exists()) {
@@ -56,7 +29,7 @@ QJsonObject ConfigStore::getConfigFromFile(const QString & filePath)
 	return doc.object();
 }
 
-void ConfigStore::saveToFile()
+void ConfigStore::saveCurrentConfigToFile() const
 {
 	QJsonObject obj = currentConfig.toJson();
 	QJsonDocument doc(obj);
@@ -66,14 +39,8 @@ void ConfigStore::saveToFile()
 	file.write(doc.toJson());
 }
 
-void ConfigStore::setWlanPattern(const QString & pattern)
+void ConfigStore::setNewConfig(const Config& newConfig)
 {
-	currentConfig.wlanPattern = pattern;
-	saveToFile();
-}
-
-void ConfigStore::setBrokerAddr(const QString & addr)
-{
-	currentConfig.brokerAddr = addr;
-	saveToFile();
+	currentConfig = newConfig;
+	saveCurrentConfigToFile();
 }
