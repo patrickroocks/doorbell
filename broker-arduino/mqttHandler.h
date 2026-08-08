@@ -25,6 +25,7 @@ public:
     void writeBuzzToLog(bool autoBuzz);
     void writeAutoBuzzStateToLogAndMqtt(bool newAutoBuzzState);
     void writeAckRingToMqtt();
+    void writeDeviceBuzzToMqtt();
     bool getMqttConnected() const;
     void addToActionLog(const String& action);
 

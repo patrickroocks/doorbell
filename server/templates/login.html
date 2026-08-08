@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="AuthContainer">
+    <form action="/doLogin" method="post" class="AuthForm">
+        <div class="AuthGrid">
+            <label class="AuthLabel" for="username">User</label>
+            <input id="username" type="text" name="username" placeholder="Username" required class="AuthInput">
+
+            <label class="AuthLabel" for="password">Password</label>
+            <input id="password" type="password" name="password" placeholder="Password" required class="AuthInput">
+
+            <div></div>
+            <button type="submit" class="Button">Login</button>
+        </div>
+    </form>
+</div>
+
+
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+
+<p class="ServerLogInfo">
+    Showing the last {{ months }} month{% if months != 1 %}s{% endif %} ({{ row_count }} event{% if row_count != 1 %}s{% endif %}).
+</p>
+
+<table class="ServerLogLegend">
+    <tbody>
+        {% for entry in legend %}
+        <tr>
+            <td>{{ entry.icon }}</td>
+            <td>{{ entry.text }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<table class="ServerLog">
+    <thead>
+        <tr>
+            <th>Time</th>
+            <th>Event</th>
+            <th>Details</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in rows %}
+        <tr>
+            <td>{{ row.time }}</td>
+            <td>{{ row.icon }} {{ row.description }}</td>
+            <td>{{ row.details }}</td>
+        </tr>
+        {% endfor %}
+        {% if row_count == 0 %}
+        <tr>
+            <td colspan="3">No events in this time range.</td>
+        </tr>
+        {% endif %}
+    </tbody>
+</table>
+
+<form action="/serverLog" method="get">
+    <input type="hidden" name="months" value="{{ next_months }}">
+    <button class="Button" type="submit">Earlier events</button>
+</form>
+
+{% endblock %}

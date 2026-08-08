@@ -1,5 +1,7 @@
 #pragma once
 
+// MQTT protocol contract (topics, messages, examples): see doc/mqtt-contract.md - keep in sync.
+
 #include <QtCore/QtCore>
 
 #include "util.h"

@@ -1,0 +1,100 @@
+{% if let Some(user_name) = base.user_name %}
+
+
+<div id="sidebar">
+    <div class="SidebarBox">
+        <div class="SidebarHeading">System</div>
+        <div id="system_states" class="SidebarBody SystemGrid">
+            <div class="SystemLabel">User:</div>
+            <div>{{ user_name }}</div>
+
+            <div></div>
+            <form action="/doLogout" method="post"><button class="Button">Logout</button></form>
+
+            <div class="SystemLabel">Connection:</div>
+            <div>
+                <span id="connection_state_dot" class="{{ base.connection_state.styleClass() }}"></span>
+                <span id="connection_state_text">{{ base.connection_state }}</span>
+            </div>
+
+            <div class="SystemLabel" title="Device AutoBuzz">Dev-AB:</div>
+            <div>
+                <span id="auto_buzz_state_dot" class="{{ base.auto_buzz_state.styleClass() }}"></span>
+                <span id="auto_buzz_state_text" title="Device AutoBuzz state">{{ base.auto_buzz_state }}</span>
+            </div>
+
+            <div class="SystemLabel" title="Rule AutoBuzz">Rule-AB:</div>
+            <div>
+                <span id="rule_auto_buzz_state_dot" class="{{ base.rule_auto_buzz_state.styleClass() }}"></span>
+                <span id="rule_auto_buzz_state_text" title="Rule AutoBuzz state">{{ base.rule_auto_buzz_state }}</span>
+            </div>
+
+            <div></div>
+            <span class="SmallMarker" style="display:none" id="updates_disabled_marker">Updates disabled</span>
+        </div>
+    </div>
+
+    <div class="SidebarBox">
+        <div class="SidebarHeading">Navigation</div>
+        <div id="navigation" class="SidebarBody SidebarNav">
+            <a href="/">Main Page</a>
+            <a href="/rules">Rules</a>
+            <a href="/settings">Settings</a>
+            <a href="/diagnostics">Diagnostics</a>
+            <a href="/deviceLog">Device log</a>
+            <a href="/serverLog">Server log</a>
+        </div>
+    </div>
+</div>
+
+
+<script>
+    // JavaScript code after the sidebar HTML to ensure the elements are already present in the DOM.
+    const sseDisabled = "{{ base.sse_disabled | json  }}" === "true";
+
+    function updateElement(htmlElementIdPrefix, jsonString) {
+        const jsonObject = JSON.parse(jsonString);
+        document.getElementById(htmlElementIdPrefix + "_text").textContent = jsonObject.stateStr;
+        document.getElementById(htmlElementIdPrefix + "_dot").className = jsonObject.styleClass;
+    }
+
+    function subscribeToSse(htmlElementId, streamUrl) {
+
+        const eventSource = new EventSource(streamUrl);
+        var lastUpdateTimestamp = 0;
+
+        eventSource.onmessage = (event) => {
+            updateElement(htmlElementId, event.data);
+            lastUpdateTimestamp = Date.now();
+        };
+
+        eventSource.onerror = () => {
+            eventSource.close();
+            // Prevent rapid reconnection attempts.
+            // We automatically try to reconnect after a server outage.
+            const justUpdated = (Date.now() - lastUpdateTimestamp) < 1000;
+            if (eventSource.readyState === EventSource.CLOSED && justUpdated) {
+                // Immediate resubscribe after an update
+                subscribeToSse(htmlElementId, streamUrl);
+            } else {
+                console.log(`Error in SSE for ${htmlElementId}, reconnecting in 5s`);
+                setTimeout(() => subscribeToSse(htmlElementId, streamUrl), 5000);
+            }
+        };
+    }
+
+    function start() {
+        subscribeToSse('connection_state', '/connStateStream');
+        subscribeToSse('auto_buzz_state', '/autoBuzzStateStream');
+        subscribeToSse('rule_auto_buzz_state', '/ruleAutoBuzzStateStream');
+    }
+
+    if (!sseDisabled) {
+        setTimeout(start, 100);
+    } else {
+        document.getElementById('updates_disabled_marker').style.display = 'inline-block';
+    }
+
+</script>
+
+{% endif %}

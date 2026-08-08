@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<form action="/saveSettings" method="post">
+    <label for="updateBehavior">System state update behavior:</label><br>
+    <select name="updateBehavior" id="updateBehavior" class="Select">
+        {% for update_behavior in update_behaviors %}
+        <option value={{ update_behavior | json | safe }} {% if update_behavior==&selected_update_behavior %}selected{%
+            endif %}>{{
+            update_behavior }}</option>
+        {% endfor %}
+    </select>
+    <br><br>
+    <button class="Button" type="submit">Save Settings</button>
+</form>
+<br>
+{% endblock %}

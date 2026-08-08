@@ -1,9 +1,28 @@
+# Secrets
 arduinoSecrets.cpp
 secrets.inc.php
+secretConfig.rs
+
+# Client artefacts
 /client/build/*
 /client/CMakeLists.txt.user
-/debug/*
-/broker-arduino/.vscode/*
-/project-doc/
 /client-release
 /client-win-build
+
+# VS code or AI settings in all projects
+.vscode/
+.github/
+.claude/
+
+# Debug stuff / private documentation
+/debug/*
+/project-doc/
+dev_scripts
+
+# Server artifacts / runtime state
+/server/target/
+/server/cfg/*.json
+/server/data
+
+# Emulated device artifacts
+/emulated-device/target/

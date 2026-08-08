@@ -1,0 +1,25 @@
+{
+    "users": [
+        {
+            "username": "user1",
+            "password": "pass1"
+        },
+        {
+            "username": "user2",
+            "password": "pass2"
+        }
+    ],
+    "httpPort": 3001,
+    "mqttServers": [
+        {
+            "host": "external.broker.example",
+            "port": 1883
+        },
+        {
+            "host": "localhost",
+            "port": 1883
+        }
+    ],
+    "mqttClientId": "doorbellHttpServer",
+    "logRetentionDays": 180
+}

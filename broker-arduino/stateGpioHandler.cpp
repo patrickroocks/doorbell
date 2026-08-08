@@ -198,6 +198,9 @@ void StateGpioHandler::ackRingAndBuzzButton()
     ackRing();
     if (!autoBuzz) {
         buzz();
+        // Announce the physical buzz-button press to the controllers (auto-buzz is covered by
+        // the ring message, server-commanded buzzes by buzzAck). See doc/mqtt-contract.md.
+        mqttHandler->writeDeviceBuzzToMqtt();
     }
 }
 

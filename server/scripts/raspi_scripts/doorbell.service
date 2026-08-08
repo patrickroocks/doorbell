@@ -1,0 +1,16 @@
+[Unit]
+Description=Doorbell HTTP Server
+After=network.target mosquitto.service
+
+[Service]
+Type=simple
+User=raspi
+WorkingDirectory=/home/raspi/doorbell_release
+ExecStart=/home/raspi/doorbell_release/doorbell_http_server --config /home/raspi/doorbell_release/config_release.json
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

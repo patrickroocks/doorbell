@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block content %}
+
+<form action="/saveRule" method="post" class="RuleForm">
+    {% if !rule.is_new %}
+    <input type="hidden" name="id" value="{{ rule.id }}">
+    {% endif %}
+
+    <div class="RuleFormGrid">
+        <label for="name">Name:</label>
+        <input type="text" id="name" name="name" class="AuthInput" value="{{ rule.name }}" placeholder="unnamed">
+
+        <label for="enabled">Enabled:</label>
+        <input type="checkbox" id="enabled" name="enabled" {% if rule.enabled %}checked{% endif %}>
+
+        <label for="autoAck">Auto Ack:</label>
+        <input type="checkbox" id="autoAck" name="autoAck" {% if rule.auto_ack %}checked{% endif %}>
+
+        <label for="singleShot">Single shot:</label>
+        <input type="checkbox" id="singleShot" name="singleShot" {% if rule.single_shot %}checked{% endif %}>
+
+        <label for="startDate">Start date:</label>
+        <div class="RuleDateField">
+            <button type="button" class="StepButton" data-target="startDate" data-days="-1" title="One day earlier">&minus;</button>
+            <input type="date" id="startDate" name="startDate" class="AuthInput" value="{{ rule.start_date }}">
+            <button type="button" class="StepButton" data-target="startDate" data-days="1" title="One day later">+</button>
+        </div>
+
+        <label for="endDate">End date:</label>
+        <div class="RuleDateField">
+            <button type="button" class="StepButton" data-target="endDate" data-days="-1" title="One day earlier">&minus;</button>
+            <input type="date" id="endDate" name="endDate" class="AuthInput" value="{{ rule.end_date }}">
+            <button type="button" class="StepButton" data-target="endDate" data-days="1" title="One day later">+</button>
+        </div>
+
+        <div class="RuleFormHint RuleFormWarning" id="dateOrderWarning" hidden>End date is earlier than start date</div>
+
+        <label for="activationTime">Activation time:</label>
+        <input type="time" id="activationTime" name="activationTime" class="AuthInput" value="{{ rule.activation_time }}" required>
+
+        <label for="deactivationTime">Deactivation time:</label>
+        <input type="time" id="deactivationTime" name="deactivationTime" class="AuthInput" value="{{ rule.deactivation_time }}" required>
+
+        <div class="RuleFormHint RuleFormInfo" id="timeWrapHint" hidden>End time refers to next day</div>
+    </div>
+
+    <div class="RuleFormButtons">
+        <button class="Button ButtonInline" type="submit">Save rule</button>
+        <a class="Button ButtonInline ButtonSecondary" href="/rules">Cancel</a>
+    </div>
+</form>
+
+<script>
+    (() => {
+        const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+        const startDate = document.getElementById('startDate');
+        const endDate = document.getElementById('endDate');
+        const activationTime = document.getElementById('activationTime');
+        const deactivationTime = document.getElementById('deactivationTime');
+        const dateOrderWarning = document.getElementById('dateOrderWarning');
+        const timeWrapHint = document.getElementById('timeWrapHint');
+
+        // Dates are handled as UTC timestamps, so day arithmetic is unaffected by DST shifts.
+        function parseDate(value) {
+            const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+            if (!parts) {
+                return null;
+            }
+            return Date.UTC(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3]));
+        }
+
+        function formatDate(timestamp) {
+            return new Date(timestamp).toISOString().slice(0, 10);
+        }
+
+        function today() {
+            const now = new Date();
+            return Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+        }
+
+        function updateHints() {
+            const start = parseDate(startDate.value);
+            const end = parseDate(endDate.value);
+            dateOrderWarning.hidden = start === null || end === null || end >= start;
+
+            const activation = activationTime.value;
+            const deactivation = deactivationTime.value;
+            // Both values have the same "HH:MM" shape, hence a plain string compare suffices.
+            timeWrapHint.hidden = !activation || !deactivation || deactivation >= activation;
+        }
+
+        // Anchor for the start date shift. Only updated with parsable values, so clearing the
+        // field and typing a new date still shifts relative to the last valid date.
+        let previousStart = parseDate(startDate.value);
+
+        startDate.addEventListener('change', () => {
+            const newStart = parseDate(startDate.value);
+            const end = parseDate(endDate.value);
+            if (newStart !== null && previousStart !== null && end !== null) {
+                endDate.value = formatDate(end + (newStart - previousStart));
+            }
+            if (newStart !== null) {
+                previousStart = newStart;
+            }
+            updateHints();
+        });
+
+        endDate.addEventListener('change', updateHints);
+        activationTime.addEventListener('change', updateHints);
+        deactivationTime.addEventListener('change', updateHints);
+
+        for (const button of document.querySelectorAll('.StepButton')) {
+            button.addEventListener('click', () => {
+                const input = document.getElementById(button.dataset.target);
+                const current = parseDate(input.value);
+                // An empty date means "no limit", stepping it starts out from today.
+                input.value = formatDate(current === null ? today() : current + Number(button.dataset.days) * MS_PER_DAY);
+                // Let the change handlers above do the shifting and hint updates.
+                input.dispatchEvent(new Event('change'));
+            });
+        }
+
+        updateHints();
+    })();
+</script>
+
+{% endblock %}

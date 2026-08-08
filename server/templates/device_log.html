@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div id="log" class="DeviceLog">Loading...</div>
+
+<script>
+    function initLog() {
+        // Log is retrieved by the server, when the device log stream is opened,
+        // so there should no race conditions here.
+        const eventSource = new EventSource('/deviceLogStream');
+
+        eventSource.onmessage = (event) => {
+            // textContent, not innerHTML: the log content comes from the device. The line breaks
+            // survive because .DeviceLog is styled with "white-space: pre-wrap".
+            document.getElementById('log').textContent = event.data;
+            eventSource.close();
+        };
+
+        eventSource.onerror = () => {
+            eventSource.close();
+            // Retry after 5 seconds if connection fails
+            setTimeout(initLog, 5000);
+        };
+    }
+
+    initLog();
+</script>
+{% endblock %}

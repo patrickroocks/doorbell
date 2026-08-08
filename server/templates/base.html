@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>{{ base.page_title }} - Doorbell</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="/static/doorbell.css?v={{ base.asset_version|urlencode }}">
+    <link rel="icon" href="/static/favicon.ico" type="image/vnd.microsoft.icon">
+</head>
+
+<body>
+    <div class="PageShell">
+        {% if let Some(last_success_message) = base.last_success_message %}
+        <div class="LastSuccessMessage">{{ last_success_message }}</div>
+        {% endif %}
+
+        {% if let Some(last_err_message) = base.last_err_message %}
+        <div class="LastErrMessage">{{ last_err_message }}</div>
+        {% endif %}
+
+        <div class="Layout">
+            {% include "sidebar.html" %}
+            <div id="content" class="Content">
+                <h1>{{ base.page_title }}</h1>
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+
+        <div class="footer">
+            {{ base.app_name_and_version }} - &copy; {{ base.current_year }} Patrick Roocks<br>
+            {{ base.build_time_info }}
+        </div>
+    </div>
+</body>
+
+</html>

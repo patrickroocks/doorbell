@@ -9,6 +9,7 @@
 
 namespace {
 
+// MQTT protocol contract (topics, messages, examples): see doc/mqtt-contract.md - keep in sync.
 const QMqttTopicName RingTopic{"doorRing"};
 const QMqttTopicName CommandTopic{"cmd"};
 const QMqttTopicName ResponseTopic{"response"};

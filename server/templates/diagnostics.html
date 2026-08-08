@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="FunctionLine">
+    Service start time: <span class="InfoLabel">{{ service_start_time }}</span>
+</div>
+<div class="FunctionLine">
+    Device start time: <span class="InfoLabel">{{ device_start_time }}</span>
+</div>
+<div class="FunctionLine">
+    Device reboot time: <span class="InfoLabel">{{ device_reboot_time }}</span>
+</div>
+<div class="FunctionLine">
+    MQTT server: <span class="InfoLabel">{{ mqtt_server }}</span>
+</div>
+<div class="FunctionLine">
+    <form action="/reboot" method="post" onsubmit="return confirm('Do you really want to reboot the device?');">
+        <button class="Button">Reboot Device</button>
+    </form>
+</div>
+
+{% endblock %}

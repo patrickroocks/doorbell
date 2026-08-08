@@ -1,0 +1,15 @@
+[package]
+name = "doorbell_emulated_device"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chrono = { version = "0.4", features = ["clock"] }
+clap = { version = "4.6", features = ["derive"] }
+crossterm = "0.28"
+rumqttc = "0.25"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1.0"
+strum = "0.28"
+strum_macros = "0.28"
+tokio = { version = "1", features = ["full"] }

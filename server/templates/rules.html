@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="FunctionLine RuleToolbar">
+    <a class="Button ButtonInline" href="/editRule">New rule</a>
+</div>
+
+<div class="FunctionLine RuleToolbar">
+    <form action="/shortcutRule" method="post" class="ShortcutRuleForm">
+        <label for="shortcutHours">Create single shot Auto Ack for:</label>
+        <button type="button" class="StepButton" data-hours="-1" title="One hour less">&minus;</button>
+        <input type="number" id="shortcutHours" name="hours" class="AuthInput HoursInput" value="4" min="1" max="23" step="1" required>
+        <button type="button" class="StepButton" data-hours="1" title="One hour more">+</button>
+        <span>h</span>
+        <button class="Button ButtonInline" type="submit">Create</button>
+    </form>
+</div>
+
+<script>
+    (() => {
+        const hours = document.getElementById('shortcutHours');
+        const minHours = Number(hours.min);
+        const maxHours = Number(hours.max);
+
+        for (const button of document.querySelectorAll('.ShortcutRuleForm .StepButton')) {
+            button.addEventListener('click', () => {
+                const current = Number(hours.value);
+                const base = hours.value !== '' && Number.isFinite(current) ? current : minHours;
+                hours.value = Math.min(maxHours, Math.max(minHours, base + Number(button.dataset.hours)));
+            });
+        }
+
+        // Confirmation dialogs come from a data attribute rather than an inline "onsubmit", because
+        // they contain the rule name: HTML attribute escaping does not protect a JS string literal,
+        // as the HTML parser decodes the entities before the JS parser sees them. Delegated on the
+        // document, so it also covers the forms further down the page.
+        document.addEventListener('submit', (event) => {
+            const message = event.target.dataset && event.target.dataset.confirm;
+            if (message && !confirm(message)) {
+                event.preventDefault();
+            }
+        });
+    })();
+</script>
+
+{% if rows.is_empty() %}
+<p class="SmallInfoText">No rules defined yet.</p>
+{% else %}
+<div class="TableScroll">
+<table class="ServerLog RuleTable">
+    <tr>
+        <th></th>
+        <th>Name</th>
+        <th>Flags</th>
+        <th>Start date</th>
+        <th>End date</th>
+        <th>Time-Span</th>
+        <th>Actions</th>
+    </tr>
+    {% for row in rows %}
+    <tr>
+        <td class="RuleToggleCell">
+            {% if row.pending_delete %}
+            <span class="StateDot DotOrange" title="just fired, pending delete"></span>
+            {% else %}
+            <form action="/toggleRule" method="post"
+                  data-confirm="Do you really want to {% if row.enabled %}disable{% else %}enable{% endif %} rule '{{ row.name }}'?">
+                <input type="hidden" name="id" value="{{ row.id }}">
+                <button type="submit" class="ToggleSwitch {% if row.enabled %}ToggleOn{% else %}ToggleOff{% endif %}"
+                        title="{% if row.enabled %}Disable rule{% else %}Enable rule{% endif %}"></button>
+            </form>
+            <span class="StateDot {% if row.active %}DotGreen{% else %}DotGrey{% endif %}"
+                  title="{% if row.active %}Currently active{% else %}Currently inactive{% endif %}"></span>
+            {% endif %}
+        </td>
+        <td>{{ row.name }}</td>
+        <td>
+            {%- if row.auto_ack %}Auto-ACK{% endif -%}
+            {%- if row.auto_ack && row.single_shot %}<br>{% endif -%}
+            {%- if row.single_shot %}Single shot{% endif -%}
+            {%- if !row.auto_ack && !row.single_shot %}–{% endif -%}
+        </td>
+        <td>{% if row.start_date.is_empty() %}–{% else %}{{ row.start_date }}{% endif %}</td>
+        <td>{% if row.end_date.is_empty() %}–{% else %}{{ row.end_date }}{% endif %}</td>
+        <td class="RuleTimeSpan">{{ row.activation_time }}–{{ row.deactivation_time }}</td>
+        <td class="RuleActions">
+            {% if !row.pending_delete %}
+            <a href="/editRule?id={{ row.id }}" title="Edit">✏️</a>
+            <form action="/deleteRule" method="post" data-confirm="Really delete rule '{{ row.name }}'?">
+                <input type="hidden" name="id" value="{{ row.id }}">
+                <button type="submit" title="Delete">🗑️</button>
+            </form>
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+</div>
+{% endif %}
+
+{% endblock %}

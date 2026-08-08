@@ -16,7 +16,7 @@ It contains two projects:
   * See [client/readme.md](client/readme.md) for details.
 
 Related docs:
-* In [doc/system-sketch.pdf](doc/system-sketch.pdf) the connections of the hardware are sketched.
+* In [doc/system-sketch.md](doc/system-sketch.md) the connections of the hardware are sketched.
 * In [CHANGES.md](CHANGES.md) the history of the project is documented.
 
 

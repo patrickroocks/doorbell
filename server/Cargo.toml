@@ -1,0 +1,32 @@
+[package]
+name = "doorbell_http_server"
+version = "0.3.0"
+edition = "2024"
+
+[dependencies]
+askama = { version = "0.16", features = ["serde_json"] }
+axum =  { version = "0.8", features = ["macros"] }
+chrono = { version = "0.4", features = ["clock", "serde"] }
+clap = { version = "4.6", features = ["derive"] }
+cookie = { version = "0.18", features = ["percent-encode"] }
+futures = "0.3"
+hyper = { version = "1.11", features = ["server", "http1"] }
+reqwest = { version = "0.13" }
+rumqttc = "0.25"
+rusqlite = { version = "0.40", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1.0"
+strum = "0.28"
+strum_macros = "0.28"
+time = "0.3"
+tokio = { version = "1", features = ["full"] }
+tower-cookies = "0.11"
+tower-http = { version = "0.7", features = ["fs"] }
+tower-layer = "0.3"
+tower-service = "0.3"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+uuid = { version = "1", features = ["v4"] }
+
+[build-dependencies]
+chrono = { version = "0.4", features = ["clock"] }

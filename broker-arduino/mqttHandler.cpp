@@ -11,6 +11,8 @@ using namespace mqttBrokerName;
 const char* MqttServerAddr = "localhost";
 constexpr int MqttBrokerPort = 1883;
 
+// MQTT protocol contract (topics, messages, examples): see doc/mqtt-contract.md - keep in sync.
+
 // Topics
 const char* CommandTopic = "cmd";
 const char* RingTopic = "doorRing";
@@ -32,6 +34,7 @@ const char* CmdReboot = "reboot";
 // Messages
 const char* MsgRing = "ring";
 const char* MsgAckRing = "ackRing";
+const char* MsgDeviceBuzz = "deviceBuzz";
 const char* MsgAckReboot = "ackReboot";
 const char* MsgTestRing = "testRing";
 const char* MsgAutoBuzzOn = "autoBuzzOn";
@@ -226,6 +229,13 @@ void MqttHandler::writeAckRingToMqtt()
 {
     if (client.connected()) {
         client.publish(RingTopic, MsgAckRing);
+    }
+}
+
+void MqttHandler::writeDeviceBuzzToMqtt()
+{
+    if (client.connected()) {
+        client.publish(RingTopic, MsgDeviceBuzz);
     }
 }
 
