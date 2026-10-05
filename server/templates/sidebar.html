@@ -19,8 +19,8 @@
 
             <div class="SystemLabel" title="Device AutoBuzz">Dev-AB:</div>
             <div>
-                <span id="auto_buzz_state_dot" class="{{ base.auto_buzz_state.styleClass() }}"></span>
-                <span id="auto_buzz_state_text" title="Device AutoBuzz state">{{ base.auto_buzz_state }}</span>
+                <span id="device_auto_buzz_state_dot" class="{{ base.device_auto_buzz_state.styleClass() }}"></span>
+                <span id="device_auto_buzz_state_text" title="Device AutoBuzz state">{{ base.device_auto_buzz_state }}</span>
             </div>
 
             <div class="SystemLabel" title="Rule AutoBuzz">Rule-AB:</div>
@@ -85,7 +85,7 @@
 
     function start() {
         subscribeToSse('connection_state', '/connStateStream');
-        subscribeToSse('auto_buzz_state', '/autoBuzzStateStream');
+        subscribeToSse('device_auto_buzz_state', '/deviceAutoBuzzStateStream');
         subscribeToSse('rule_auto_buzz_state', '/ruleAutoBuzzStateStream');
     }
 

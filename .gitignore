@@ -24,5 +24,10 @@ dev_scripts
 /server/cfg/*.json
 /server/data
 
+# Delivery2Door artifacts
+/delivery2door/config/*.json
+/delivery2door/data
+/delivery2door/target/
+
 # Emulated device artifacts
 /emulated-device/target/

@@ -1,0 +1,67 @@
+{
+    "general": {
+        "queryIntervalSeconds": 600,
+        "toleranceMinutes": 120,
+        "fullDayStartHour": 8,
+        "fullDayEndHour": 20,
+        "logRetentionDays": 180
+    },
+    "httpPort": 3002,
+    "users": [
+        {
+            "username": "user1",
+            "password": "pass1"
+        }
+    ],
+    "doorbell": {
+        "baseUrl": "http://localhost:3001",
+        "apiToken": "put-a-long-random-token-here"
+    },
+    "ruleCreation": {
+        "namePrefix": "",
+        "autoAck": true,
+        "singleShot": false,
+        "deleteAtEnd": true
+    },
+    "sources": [
+        {
+            "type": "mail",
+            "server": "imap.example.com",
+            "port": 993,
+            "user": "imap-user",
+            "pass": "imap-password",
+            "restrictToFolder": "Inbox",
+            "senderMasks": [
+                "noreply@dhl.de",
+                "shipment-tracking@amazon.de"
+            ],
+            "lookBackDays": 14,
+            "crawlers": [
+                "dhl-mail"
+            ]
+        }
+    ],
+    "notificationSinks": [
+        {
+            "type": "mail",
+            "name": "mail-to-me",
+            "server": "smtp.example.com",
+            "port": 587,
+            "user": "smtp-user",
+            "pass": "smtp-password",
+            "security": "starttls",
+            "from": "doorbell@example.com",
+            "to": "me@example.com",
+            "subject": "[Doorbell] Tracking notification: {carrier} - {trackingNumber}",
+            "body": "Delivery for {carrier} tracking number {trackingNumber} is expected to arrive on {deliveryDate}, {deliveryWindow}\nAutoBuzz-Rule \"{ruleName}\" (id {ruleId}) was {event}{previousWindowNote} in Doorbell-Server: {doorbellServerAddress}\nFound in: {source}"
+        }
+    ],
+    "crawlers": {
+        "dhl-mail": {
+            "namePrefix": "DHL",
+            "deliveryIdentifier": "piececode=([A-Za-z0-9]+)",
+            "deliveryDateToday": "heute zwischen {HH:MM} - {HH:MM} Uhr",
+            "deliveryDateFuture": "am {Weekday}, den {DD.MM}"
+        }
+    }
+}

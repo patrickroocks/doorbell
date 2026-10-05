@@ -539,6 +539,7 @@ void RingListener::reloadSettings()
 {
 	if (cfgStore->getCurrentConfig() != conn.currentConfig)
 	{
+		conn.currentConfig = cfgStore->getCurrentConfig();
 		conn.mqtt.disconnectFromHost();
 		mqttConnect();
 	}

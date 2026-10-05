@@ -1,0 +1,22 @@
+[Unit]
+Description=Delivery2Door Service
+# The doorbell service is what the rules are created in, so it should be up first. Its HTTP port may
+# still be opening when this service starts, which the startup delay below covers.
+After=network-online.target doorbell.service
+Wants=network-online.target doorbell.service
+
+[Service]
+Type=simple
+User=raspi
+WorkingDirectory=/home/raspi/delivery2door_release
+# The first poll happens right at startup: give the doorbell service a moment to open its port, so a
+# delivery announced while both services were down is not missed on the very first cycle.
+ExecStartPre=/bin/sleep 15
+ExecStart=/home/raspi/delivery2door_release/delivery2door --config /home/raspi/delivery2door_release/config-release.json
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

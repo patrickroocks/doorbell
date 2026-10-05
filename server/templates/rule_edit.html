@@ -19,6 +19,10 @@
         <label for="singleShot">Single shot:</label>
         <input type="checkbox" id="singleShot" name="singleShot" {% if rule.single_shot %}checked{% endif %}>
 
+        <label for="deleteAtEnd" title="Rule deletes itself after the last window has ended. Needs an end date.">Delete at
+            end:</label>
+        <input type="checkbox" id="deleteAtEnd" name="deleteAtEnd" {% if rule.delete_at_end %}checked{% endif %}>
+
         <label for="startDate">Start date:</label>
         <div class="RuleDateField">
             <button type="button" class="StepButton" data-target="startDate" data-days="-1" title="One day earlier">&minus;</button>

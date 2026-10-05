@@ -1,0 +1,31 @@
+[package]
+name = "delivery2door"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+askama = { version = "0.16", features = ["serde_json"] }
+axum = { version = "0.8", features = ["macros"] }
+chrono = { version = "0.4", features = ["clock", "serde"] }
+clap = { version = "4.6", features = ["derive"] }
+imap = { version = "3.0.0-alpha.15", features = ["native-tls"] }
+lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "pool", "hostname", "native-tls", "tokio1", "tokio1-native-tls"] }
+mailparse = "0.17"
+native-tls = "0.2"
+regex = "1"
+reqwest = { version = "0.13", features = ["json"] }
+rusqlite = { version = "0.40", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1.0"
+strum = "0.28"
+strum_macros = "0.28"
+time = "0.3"
+tokio = { version = "1", features = ["full"] }
+tower-cookies = "0.11"
+tower-http = { version = "0.7", features = ["fs"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+uuid = { version = "1", features = ["v4"] }
+
+[build-dependencies]
+chrono = { version = "0.4", features = ["clock"] }

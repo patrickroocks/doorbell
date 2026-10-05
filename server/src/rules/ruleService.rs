@@ -17,7 +17,7 @@ const TICK_INTERVAL: Duration = Duration::from_secs(1);
 
 // Grace period between a single-shot rule's first ring and its removal. People at the door are
 // sometimes too slow walking from the bell to the buzzed door and press the bell a second time
-const HUMAN_DOOR_OPEN_TOLERANCE_TIME: Duration = Duration::from_secs(10);
+const HUMAN_DOOR_OPEN_TOLERANCE_TIME: Duration = Duration::from_secs(30);
 
 // After a rule change, we need a immediate evaluation.
 pub type RulesChangedFlag = Arc<AtomicBool>;
@@ -62,7 +62,7 @@ impl PendingRemovals {
 pub struct RuleService {
     store: RuleStore,
     rxMqtt: mpsc::Receiver<IntMsg>, // ring events from the device
-    mqttTx: mpsc::Sender<IntMsg>,   // commands to the device (Buzz/AckRing)
+    mqttTx: mpsc::Sender<IntMsg>,   // commands to the device (Buzz/AckRing, rule auto-buzz state)
     httpTx: mpsc::Sender<IntMsg>,   // rule-based auto-buzz state for the web UI
     logTx: mpsc::Sender<LogEvent>,
     rulesChanged: RulesChangedFlag, // set by the HTTP layer after a rule CRUD change
@@ -167,6 +167,9 @@ impl RuleService {
             }
         }
 
+        // Rules that delete themselves at the end of their last window.
+        let deletedAtEndIds = self.handleDeleteAtEndRemovals(now).await;
+
         let autoBuzzWasActiveByRule = !self.activated.is_empty();
 
         // Check the stored rules for active rules.
@@ -190,14 +193,19 @@ impl RuleService {
         let allStoredRuleIds: HashSet<i64> = rules.iter().map(|r| r.id).collect();
         let deletedRules: Vec<Rule> = self.activated.extract_if(|id, _| !allStoredRuleIds.contains(id)).map(|(_, rule)| rule).collect();
         for rule in &deletedRules {
+            // A rule deleted at the end of its lifetime was already reported as RuleDeleteAtEnd,
+            // which implies its deactivation - no second line for the same event.
+            if deletedAtEndIds.contains(&rule.id) {
+                continue;
+            }
             // The event type already says "due to deletion", so only our own removal needs a remark.
             let additionalInfo = if autoRemovedIds.contains(&rule.id) { ", auto removed" } else { "" };
             self.logForRuleWithInfo(LogEventType::RuleDeactivateDelete, rule, additionalInfo).await;
         }
 
         // Now we have the new rule based auto buzz state. The rules never switch the auto-buzzer of the
-        // device - they buzz themselves on a ring - so only the web UI state is updated here. Otherwise
-        // the auto-buzz switch on the device would appear broken to the user.
+        // device - they buzz themselves on a ring - so only the web UI and the device's rule LED are
+        // updated here. Otherwise the auto-buzz switch on the device would appear broken to the user.
         let autoBuzzIsActiveByRule = !self.activated.is_empty();
         if autoBuzzIsActiveByRule != autoBuzzWasActiveByRule {
             self.sendRuleAutoBuzzState(autoBuzzIsActiveByRule).await;
@@ -253,6 +261,25 @@ impl RuleService {
         self.logEvent(eventType, format!("Rules: '{}'", Self::joinRuleNames(rules))).await;
     }
 
+    // Deletes every rule whose lifetime has run out, i.e. whose last window has ended and which is
+    // flagged `deleteAtEnd`. Such rules are created by another service (delivery announcements) and
+    // nobody would clean them up by hand.
+    //
+    // Returns their ids, so the deactivation logging in `evaluateTransitions` does not report them a
+    // second time. A disabled rule is deleted as well - its lifetime is over either way.
+    async fn handleDeleteAtEndRemovals(&mut self, now: DateTime<Local>) -> HashSet<i64> {
+        let dueRules: Vec<Rule> =
+            self.store.getRules().into_iter().filter(|rule| rule.deletionTimeAt().is_some_and(|deleteAt| now >= deleteAt)).collect();
+
+        let mut removedIds = HashSet::new();
+        for rule in &dueRules {
+            self.store.deleteRule(rule.id);
+            self.logForRule(LogEventType::RuleDeleteAtEnd, rule).await;
+            removedIds.insert(rule.id);
+        }
+        removedIds
+    }
+
     // Removes a single-shot rule after the grace period. Returns whether the rule was really removed,
     // so the caller can tell its deactivation apart from a deletion in the web UI. The auto-buzzer is
     // switched off by the next evaluation (unless another rule still needs it on).
@@ -288,11 +315,13 @@ impl RuleService {
         }
     }
 
-    // Tells the web UI whether a rule is currently armed to buzz on a ring.
+    // Tells the web UI and the device whether a rule is currently active to buzz on a ring.
     async fn sendRuleAutoBuzzState(&self, activeByRule: bool) {
         if let Err(e) = self.httpTx.send(IntMsg::SetRuleAutoBuzz(activeByRule)).await {
             error!("RuleService: failed to report the rule auto-buzz state: {}", e);
         }
+        // The device shows the state on its rule LED, it never acts on it.
+        self.sendMqtt(IntMsg::SetRuleAutoBuzz(activeByRule)).await;
     }
 
     async fn logEvent(&self, eventType: LogEventType, details: impl Into<String>) {

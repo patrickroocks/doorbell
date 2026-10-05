@@ -80,6 +80,11 @@ pub enum MsgCmd {
     SetAutoBuzzOn,
     #[strum(serialize = "autoBuzzOff")]
     SetAutoBuzzOff,
+    // Rule-based auto-buzz: display only on the device (LED), the buzz itself is sent as "buzz".
+    #[strum(serialize = "ruleAutoBuzzOn")]
+    SetRuleAutoBuzzOn,
+    #[strum(serialize = "ruleAutoBuzzOff")]
+    SetRuleAutoBuzzOff,
 }
 
 impl MsgCmd {

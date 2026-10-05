@@ -13,6 +13,7 @@ const NAME_COL: &str = "name";
 const ENABLED_COL: &str = "enabled";
 const AUTO_ACK_COL: &str = "autoAck";
 const SINGLE_SHOT_COL: &str = "singleShot";
+const DELETE_AT_END_COL: &str = "deleteAtEnd";
 const START_DATE_COL: &str = "startDate";
 const END_DATE_COL: &str = "endDate";
 const ACTIVATION_TIME_COL: &str = "activationTime";
@@ -46,6 +47,7 @@ impl RuleStore {
             std::process::exit(1);
         });
         Self::initSchema(&connection);
+        Self::migrateSchema(&connection);
 
         // The only read of the rule table; from here on the in-memory map is the source of truth.
         let rules = Self::loadRulesFromDb(&connection);
@@ -66,6 +68,7 @@ impl RuleStore {
                  {ENABLED_COL}           INTEGER NOT NULL,
                  {AUTO_ACK_COL}          INTEGER NOT NULL,
                  {SINGLE_SHOT_COL}       INTEGER NOT NULL,
+                 {DELETE_AT_END_COL}     INTEGER NOT NULL DEFAULT 0,
                  {START_DATE_COL}        TEXT,
                  {END_DATE_COL}          TEXT,
                  {ACTIVATION_TIME_COL}   TEXT NOT NULL,
@@ -79,11 +82,41 @@ impl RuleStore {
         });
     }
 
+    // Brings a database created by an older version up to the current schema. `CREATE TABLE IF NOT
+    // EXISTS` above does nothing for a table that already exists, so a column added later has to be
+    // added here - otherwise every statement below fails on an existing rules database.
+    fn migrateSchema(connection: &Connection) {
+        for (column, definition) in [(DELETE_AT_END_COL, "INTEGER NOT NULL DEFAULT 0")] {
+            if Self::hasColumn(connection, column) {
+                continue;
+            }
+            let sql = format!("ALTER TABLE {TABLE_NAME} ADD COLUMN {} {}", column, definition);
+            match connection.execute(&sql, []) {
+                Ok(_) => info!("Rule database migrated: added column '{}'", column),
+                Err(e) => {
+                    error!("Failed to add column '{}' to the rule table: {}", column, e);
+                    std::process::exit(1);
+                }
+            }
+        }
+    }
+
+    fn hasColumn(connection: &Connection, column: &str) -> bool {
+        let sql = format!("SELECT COUNT(*) FROM pragma_table_info('{TABLE_NAME}') WHERE name = ?1");
+        match connection.query_row(&sql, rusqlite::params![column], |row| row.get::<_, i64>(0)) {
+            Ok(count) => count > 0,
+            Err(e) => {
+                error!("Failed to inspect the rule table: {}", e);
+                std::process::exit(1);
+            }
+        }
+    }
+
     // Reads the whole rule table into a map. Only called once, at startup.
     fn loadRulesFromDb(connection: &Connection) -> HashMap<i64, Rule> {
         let sql = format!(
             "SELECT {ID_COL}, {NAME_COL}, {ENABLED_COL}, {AUTO_ACK_COL}, {SINGLE_SHOT_COL}, \
-             {START_DATE_COL}, {END_DATE_COL}, {ACTIVATION_TIME_COL}, {DEACTIVATION_TIME_COL} \
+             {START_DATE_COL}, {END_DATE_COL}, {ACTIVATION_TIME_COL}, {DEACTIVATION_TIME_COL}, {DELETE_AT_END_COL} \
              FROM {TABLE_NAME}"
         );
         let mut stmt = match connection.prepare(&sql) {
@@ -139,8 +172,9 @@ impl RuleStore {
     pub fn insertRule(&self, rule: &Rule) -> Option<i64> {
         let sql = format!(
             "INSERT INTO {TABLE_NAME} ({NAME_COL}, {ENABLED_COL}, {AUTO_ACK_COL}, {SINGLE_SHOT_COL}, \
-             {START_DATE_COL}, {END_DATE_COL}, {ACTIVATION_TIME_COL}, {DEACTIVATION_TIME_COL}, {RULE_TYPE_COL}) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)"
+             {START_DATE_COL}, {END_DATE_COL}, {ACTIVATION_TIME_COL}, {DEACTIVATION_TIME_COL}, {RULE_TYPE_COL}, \
+             {DELETE_AT_END_COL}) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)"
         );
         let mut inner = self.inner.lock().unwrap();
         let result = inner.connection.execute(
@@ -155,6 +189,7 @@ impl RuleStore {
                 rule.activationTimeStr(),
                 rule.deactivationTimeStr(),
                 RULE_TYPE_AUTO_BUZZ,
+                rule.deleteAtEnd as i64,
             ],
         );
         match result {
@@ -179,7 +214,8 @@ impl RuleStore {
         let sql = format!(
             "UPDATE {TABLE_NAME} SET {NAME_COL} = ?1, {ENABLED_COL} = ?2, {AUTO_ACK_COL} = ?3, \
              {SINGLE_SHOT_COL} = ?4, {START_DATE_COL} = ?5, {END_DATE_COL} = ?6, \
-             {ACTIVATION_TIME_COL} = ?7, {DEACTIVATION_TIME_COL} = ?8 WHERE {ID_COL} = ?9"
+             {ACTIVATION_TIME_COL} = ?7, {DEACTIVATION_TIME_COL} = ?8, {DELETE_AT_END_COL} = ?9 \
+             WHERE {ID_COL} = ?10"
         );
         let mut inner = self.inner.lock().unwrap();
         let result = inner.connection.execute(
@@ -193,6 +229,7 @@ impl RuleStore {
                 Self::dateParam(rule.endDate),
                 rule.activationTimeStr(),
                 rule.deactivationTimeStr(),
+                rule.deleteAtEnd as i64,
                 rule.id,
             ],
         );
@@ -242,6 +279,7 @@ impl RuleStore {
         let endDate: Option<String> = row.get(6)?;
         let activationTime: String = row.get(7)?;
         let deactivationTime: String = row.get(8)?;
+        let deleteAtEnd: i64 = row.get(9)?;
 
         let activation = match Rule::parseTime(&activationTime) {
             Some(t) => t,
@@ -264,6 +302,7 @@ impl RuleStore {
             enabled: enabled != 0,
             autoAck: autoAck != 0,
             singleShot: singleShot != 0,
+            deleteAtEnd: deleteAtEnd != 0,
             startDate: startDate.as_deref().and_then(Rule::parseDate),
             endDate: endDate.as_deref().and_then(Rule::parseDate),
             activationTime: activation,

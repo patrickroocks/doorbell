@@ -7,8 +7,7 @@
 
 using namespace mqttBrokerName;
 
-// Mqtt Broker is locally on the Arduino
-const char* MqttServerAddr = "localhost";
+// Port for Mqtt Broker (if used)
 constexpr int MqttBrokerPort = 1883;
 
 // MQTT protocol contract (topics, messages, examples): see doc/mqtt-contract.md - keep in sync.
@@ -22,6 +21,8 @@ const char* ResponseTopic = "response";
 const char* CmdBuzz = "buzz";
 const char* CmdAutoBuzzOn = "autoBuzzOn";
 const char* CmdAutoBuzzOff = "autoBuzzOff";
+const char* CmdRuleAutoBuzzOn = "ruleAutoBuzzOn";
+const char* CmdRuleAutoBuzzOff = "ruleAutoBuzzOff";
 const char* CmdGetActionLog = "getActionLog";
 const char* CmdGetAutoBuzz = "getAutoBuzz";
 const char* CmdGetStartTime = "getStartTime";
@@ -128,16 +129,22 @@ void MqttHandler::setup()
     networkHandler = app->getNetworkHandler();
 
     startTime = networkHandler->getDateTime();
-    addToActionLog(String("Device started, initial autoBuzz is ") + (stateGpioHandler->getAutoBuzzState() ? "on" : "off"));
+    // NTP Time is already written to the log, if we have a valid time.
+    String ntpHint;
     if (!networkHandler->hasValidTime()) {
         networkHandler->setRequestLogWhenValidTime();
+        ntpHint = " (NTP time not yet valid)";
     }
+    addToActionLog(String("Device started, initial autoBuzz is ") + (stateGpioHandler->getAutoBuzzState() ? "on" : "off") + ntpHint);
 
     setupMqttClient();
 }
 
 void MqttHandler::loop()
 {
+    // Wait for WiFi connection?
+    if (!networkHandler->getWifiConnected()) return;
+
     // Reconnect/Loop MQTT
     if (!client.connected()) {
         if (mqttConnected) {
@@ -147,16 +154,26 @@ void MqttHandler::loop()
             stateGpioHandler->reboot();
             return;
         }
+        discardPendingMessages();
         reconnectMqttClient();
     } else {
-        mqttConnected = true;
-        stateGpioHandler->initLedsAfterStartUp();
+        if (!mqttConnected) {
+            mqttConnected = true;
+            stateGpioHandler->initLedsAfterStartUp();
+        }
+
+        // Get incoming messages.
         client.loop();
+        // Send outgoing messages.
+        flushOutbox();
+        sendPendingMultiResponse();
     }
 }
 
 void MqttHandler::callbackMqtt(char* topic, byte* payload, unsigned int length)
 {
+    // cf. doc/mqtt-contract.md.
+    // We don't publish from here (while receiving), but write into the outbox.
     if (String(topic) == CommandTopic) {
         String payloadStr = "";
         for (unsigned int i = 0; i < length; i++) {
@@ -165,27 +182,31 @@ void MqttHandler::callbackMqtt(char* topic, byte* payload, unsigned int length)
 
         if (payloadStr == CmdBuzz) {
             stateGpioHandler->buzz();
-            client.publish(ResponseTopic, MsgBuzzAck);
+            enqueueMessage(ResponseTopic, MsgBuzzAck);
         } else if (payloadStr == CmdAutoBuzzOn) {
             stateGpioHandler->setAutoBuzzState(true);
         } else if (payloadStr == CmdAutoBuzzOff) {
             stateGpioHandler->setAutoBuzzState(false);
+        } else if (payloadStr == CmdRuleAutoBuzzOn) {
+            stateGpioHandler->setRuleAutoBuzzState(true);
+        } else if (payloadStr == CmdRuleAutoBuzzOff) {
+            stateGpioHandler->setRuleAutoBuzzState(false);
         } else if (payloadStr == CmdTestRing) {
             stateGpioHandler->ring(true);
         } else if (payloadStr == CmdGetActionLog) {
-            showActionLog();
+            startMultiResponse(MultiResponse::ActionLog);
         } else if (payloadStr == CmdPing) {
-            client.publish(ResponseTopic, MsgPong);
+            enqueueMessage(ResponseTopic, MsgPong);
         } else if (payloadStr == CmdGetAutoBuzz) {
-            client.publish(ResponseTopic, stateGpioHandler->getAutoBuzzState() ? MsgAutoBuzzOn : MsgAutoBuzzOff);
+            enqueueMessage(ResponseTopic, stateGpioHandler->getAutoBuzzState() ? MsgAutoBuzzOn : MsgAutoBuzzOff);
         } else if (payloadStr == CmdAckRing) {
             stateGpioHandler->ackRing();
         } else if (payloadStr == CmdRawData) {
-            showRawData();
+            startMultiResponse(MultiResponse::RawData);
         } else if (payloadStr == CmdGetStartTime) {
-            client.publish(ResponseTopic, startTime.c_str());
+            enqueueMessage(ResponseTopic, startTime);
         } else if (payloadStr == CmdReboot) {
-            client.publish(ResponseTopic, MsgAckReboot);
+            enqueueMessage(ResponseTopic, MsgAckReboot);
             stateGpioHandler->reboot();
         } else {
             Serial.print("[MQTT] received unknown command: ");
@@ -203,40 +224,103 @@ void MqttHandler::addToActionLog(const String& action)
     actionLog.push(networkHandler->getDateTime() + " " + action);
 }
 
-void MqttHandler::showRawData()
+void MqttHandler::enqueueMessage(const char* topic, const String& payload)
 {
-    const auto& rawDataStrings = stateGpioHandler->getArchivedRawDataStrings();
-
-    for (int i = 0; i < rawDataStrings.size(); ++i) {
-        client.publish(ResponseTopic, rawDataStrings.at(i).c_str());
+    if (!client.connected()) {
+        Serial.println("[MQTT] not connected, dropping message: " + payload);
+        return;
     }
+    if (outbox.full()) {
+        // Dropping the newest keeps the order of what is already queued intact.
+        Serial.println("[MQTT] outbox full, dropping message: " + payload);
+        return;
+    }
+    outbox.push({topic, payload});
+}
 
-    const String lastString = stateGpioHandler->getCurrentRawDataStr();
-    if (lastString.length() > 0) {
-        client.publish(ResponseTopic, lastString.c_str());
+void MqttHandler::flushOutbox()
+{
+    while (!outbox.empty()) {
+        const OutboundMessage& message = outbox.front();
+        if (!client.publish(message.topic, message.payload.c_str())) {
+            Serial.println("[MQTT] publish failed on topic: " + String(message.topic));
+        }
+        outbox.popFront();
+    }
+}
+
+void MqttHandler::discardPendingMessages()
+{
+    outbox.clear();
+    pendingMultiResponse = MultiResponse::None;
+    multiResponseSeqNr = {};
+}
+
+void MqttHandler::startMultiResponse(MultiResponse kind)
+{
+    pendingMultiResponse = kind;
+    multiResponseSeqNr = {};
+}
+
+void MqttHandler::sendPendingMultiResponse()
+{
+    if (pendingMultiResponse == MultiResponse::None) return;
+
+    for (int line = 0; line < MultiResponseLinesPerLoop; ++line) {
+        if (!publishNextMultiResponseLine()) {
+            pendingMultiResponse = MultiResponse::None;
+            multiResponseSeqNr = {};
+            return;
+        }
+    }
+}
+
+bool MqttHandler::publishNextMultiResponseLine()
+{
+    // Publishes the line at multiResponseSeqNr. Returns false when the response is complete.
+    // We assume that no new `MultiResponseLinesPerLoop` lines are added to raw data / action log while we are sending the response.
+
+    if (pendingMultiResponse == MultiResponse::ActionLog) {
+        if (auto elem = actionLog.iterateBySequence(multiResponseSeqNr)) {
+            client.publish(ResponseTopic, elem->c_str());
+            return true;
+        }
+    } else if (pendingMultiResponse == MultiResponse::RawData) {
+        const auto& rawDataStrings = stateGpioHandler->getArchivedRawDataStrings();
+
+        if (auto elem = rawDataStrings.iterateBySequence(multiResponseSeqNr)) {
+            client.publish(ResponseTopic, elem->c_str());
+            return true;
+        }
+        // The still incomplete current recording is appended after the archived ones.
+        if (rawDataStrings.isLastSeqNr(multiResponseSeqNr)) {
+            ++multiResponseSeqNr.seqNr;
+            const String lastString = stateGpioHandler->getCurrentRawDataStr();
+            if (lastString.length() > 0) {
+                client.publish(ResponseTopic, lastString.c_str());
+                return true;
+            }
+        }
     }
 
     client.publish(ResponseTopic, MsgEndMultiResponse);
+    return false;
 }
 
 void MqttHandler::writeAutoBuzzStateToLogAndMqtt(bool newAutoBuzzState)
 {
-    client.publish(RingTopic, newAutoBuzzState ? MsgAutoBuzzOn : MsgAutoBuzzOff);
+    enqueueMessage(RingTopic, newAutoBuzzState ? MsgAutoBuzzOn : MsgAutoBuzzOff);
     actionLog.push(networkHandler->getDateTime() + " autoBuzz " + (newAutoBuzzState ? "on" : "off"));
 }
 
 void MqttHandler::writeAckRingToMqtt()
 {
-    if (client.connected()) {
-        client.publish(RingTopic, MsgAckRing);
-    }
+    enqueueMessage(RingTopic, MsgAckRing);
 }
 
 void MqttHandler::writeDeviceBuzzToMqtt()
 {
-    if (client.connected()) {
-        client.publish(RingTopic, MsgDeviceBuzz);
-    }
+    enqueueMessage(RingTopic, MsgDeviceBuzz);
 }
 
 void MqttHandler::writeRingToMqttAndLog(bool testRing)
@@ -245,31 +329,13 @@ void MqttHandler::writeRingToMqttAndLog(bool testRing)
 
     addToActionLog(ringStr);
 
-    if (client.connected()) {
-        String pubString = ringStr + " ";
-        if (stateGpioHandler->getAutoBuzzState() && !testRing) pubString += "auto buzz, ";
-        pubString += networkHandler->getDateTime();
-        client.publish(RingTopic, pubString.c_str());
-    } else {
-        Serial.println("MQTT not connected, cannot publish ring event");
-    }
+    String pubString = ringStr + " ";
+    if (stateGpioHandler->getAutoBuzzState() && !testRing) pubString += "auto buzz, ";
+    pubString += networkHandler->getDateTime();
+    enqueueMessage(RingTopic, pubString);
 }
 
 void MqttHandler::writeBuzzToLog(bool autoBuzz)
 {
     addToActionLog(String{"buzz "} + (autoBuzz ? "(auto)" : "(manual)"));
-}
-
-void MqttHandler::showActionLog()
-{
-    for (const auto& entry : actionLog) {
-        client.publish(ResponseTopic, entry.c_str());
-    }
-
-    client.publish(ResponseTopic, MsgEndMultiResponse);
-}
-
-bool MqttHandler::getMqttConnected() const
-{
-    return mqttConnected;
 }

@@ -34,4 +34,6 @@ Run:
 
 Incoming commands from a controller (`ping`, `buzz`, `testRing`, `autoBuzzOn/Off`,
 `getAutoBuzz`, `getActionLog`, `getStartTime`, `reboot`, …) are handled automatically and
-reflected in the rolling event log.
+reflected in the rolling event log. `ruleAutoBuzzOn/Off` - the rule auto-buzz state the real
+device shows on an LED - is only reflected in the status line, like on the device it is not
+persisted and it never triggers a buzz.

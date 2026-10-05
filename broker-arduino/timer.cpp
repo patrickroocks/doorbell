@@ -1,46 +1,59 @@
 #include "timer.h"
 
-BaseTimer::BaseTimer(int cycles)
-    : cycles(cycles)
+BaseTimer::BaseTimer(uint32_t durationMs)
+    : durationMs(durationMs)
 {}
 
 void BaseTimer::start()
 {
-    count = cycles;
+    deadlineMs = millis() + durationMs;
+    running = true;
 }
 
 void BaseTimer::stop()
 {
-    count = -1;
+    running = false;
 }
 
-void BaseTimer::decrement()
+bool BaseTimer::expired() const
 {
-    if (count >= -1) --count;
+    return (int32_t) (millis() - deadlineMs) >= 0;
 }
 
 // --------------------------------------------------------------
 
-EventTimer::EventTimer(int cycles, bool autoRestart)
-    : BaseTimer(cycles)
+EventTimer::EventTimer(uint32_t durationMs, bool autoRestart)
+    : BaseTimer(durationMs)
     , autoRestart(autoRestart)
 {}
 
-bool EventTimer::checkAndDecrement()
+bool EventTimer::checkEvent()
 {
-    bool eventRaise = count == 0;
-    decrement();
-    if (eventRaise && autoRestart) start();
-    return eventRaise;
+    if (!running) {
+        // An auto restarting timer fires on its very first check and runs on schedule from there.
+        // A one shot timer only reacts to an explicit start().
+        if (!autoRestart) return false;
+        start();
+        return true;
+    }
+
+    if (!expired()) return false;
+
+    if (autoRestart) {
+        start();
+    } else {
+        stop();
+    }
+    return true;
 }
 
 // --------------------------------------------------------------
 
-DurationTimer::DurationTimer(int cycles)
-    : BaseTimer(cycles)
+DurationTimer::DurationTimer(uint32_t durationMs)
+    : BaseTimer(durationMs)
 {}
 
-bool DurationTimer::check()
+bool DurationTimer::check() const
 {
-    return count > 0;
+    return running && !expired();
 }

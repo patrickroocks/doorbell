@@ -16,29 +16,31 @@
     </tbody>
 </table>
 
-<table class="ServerLog">
-    <thead>
-        <tr>
-            <th>Time</th>
-            <th>Event</th>
-            <th>Details</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for row in rows %}
-        <tr>
-            <td>{{ row.time }}</td>
-            <td>{{ row.icon }} {{ row.description }}</td>
-            <td>{{ row.details }}</td>
-        </tr>
-        {% endfor %}
-        {% if row_count == 0 %}
-        <tr>
-            <td colspan="3">No events in this time range.</td>
-        </tr>
-        {% endif %}
-    </tbody>
-</table>
+<div class="TableScroll">
+    <table class="ServerLog EventLog">
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>Event</th>
+                <th>Details</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                <td>{{ row.time }}</td>
+                <td>{{ row.icon }} {{ row.description }}</td>
+                <td>{{ row.details }}</td>
+            </tr>
+            {% endfor %}
+            {% if row_count == 0 %}
+            <tr>
+                <td colspan="3">No events in this time range.</td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
 
 <form action="/serverLog" method="get">
     <input type="hidden" name="months" value="{{ next_months }}">

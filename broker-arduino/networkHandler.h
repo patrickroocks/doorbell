@@ -27,6 +27,7 @@ public:
 
 
 private:
+    bool handleWifiConnection();
     void setupWifiConn(const WifiConfig& wifiConfig);
     void setupNTP();
 
@@ -39,10 +40,11 @@ private:
     WiFiUDP wifiUdp;
     NTP ntp;
     EventTimer ntpTimer;
+    EventTimer wifiReconnectTimer; // one shot, no auto restart
 
     // System states
     bool wifiConnected = false;
-    bool startupCycleCompleted = false;
     bool validTime = false;
     bool logWhenValidTime = false;
+    bool wifiReconnectPending = false;
 };

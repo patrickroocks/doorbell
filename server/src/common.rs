@@ -132,11 +132,7 @@ impl ToStateInfo for AutoBuzzState {
 
 #[derive(Debug)]
 pub enum IntMsg {
-    // Auto-buzz state of the device: as a command to the device (HTTP -> MQTT) and as the state
-    // reported back by it (MQTT -> HTTP).
-    SetAutoBuzz(bool),
-    // Whether a rule is currently armed to buzz on a ring (RuleService -> HTTP). Shown in the web UI
-    // next to the device state; the rules never switch the auto-buzzer of the device.
+    SetDeviceAutoBuzz(bool),
     SetRuleAutoBuzz(bool),
     SetConnState(ConnectionState),
     Buzz,
@@ -145,9 +141,7 @@ pub enum IntMsg {
     GetDeviceLog,
     DeviceLogContent(Vec<String>),
     StateUpdate,
-    // A real doorbell ring occurred (MQTT -> RuleService). The bool is the ring's auto-buzz flag,
-    // i.e. whether the device auto-buzzer was enabled (and the device already opened the door).
-    RingOccurred(bool),
+    RingOccurred(bool /* deviceAutoBuzzActive */),
 }
 
 // ------------- Settings -------------

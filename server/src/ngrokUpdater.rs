@@ -131,12 +131,7 @@ impl NgrokUpdater {
         // comparing every one of them against the stored address would flip back and forth.
         let newTunnelAddress = resp["tunnels"]
             .as_array()
-            .and_then(|tunnels| {
-                tunnels
-                    .iter()
-                    .filter_map(|tunnel| tunnel["public_url"].as_str())
-                    .find(|url| url.starts_with("https://"))
-            })
+            .and_then(|tunnels| tunnels.iter().filter_map(|tunnel| tunnel["public_url"].as_str()).find(|url| url.starts_with("https://")))
             .map(|url| url.to_string());
 
         if let Some(newTunnelAddress) = newTunnelAddress

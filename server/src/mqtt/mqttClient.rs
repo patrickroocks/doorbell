@@ -49,6 +49,9 @@ pub struct MqttClient {
     tsDeviceDisconnectedSince: Option<DateTime<Utc>>,
     sendRecState: SendRecState,
     appState: MtxAppState,
+    // Last rule-based auto-buzz state reported by the RuleService, None until it reported once.
+    // Cached to re-send it to the device after a reconnect - the device does not persist it.
+    ruleAutoBuzz: Option<bool>,
 }
 
 impl MqttClient {
@@ -70,6 +73,7 @@ impl MqttClient {
             tsDeviceDisconnectedSince: Some(Utc::now()),
             sendRecState: SendRecState::Idle,
             appState: appState.clone(),
+            ruleAutoBuzz: None,
         }
     }
 
@@ -93,11 +97,11 @@ impl MqttClient {
                 match MsgRing::parse(&message) {
                     Some(MsgRing::AutoBuzzOn) => {
                         self.logEvent(LogEvent::new(LogEventType::DeviceAutoBuzzOn, "")).await;
-                        self.sendInternal(IntMsg::SetAutoBuzz(true)).await;
+                        self.sendInternal(IntMsg::SetDeviceAutoBuzz(true)).await;
                     }
                     Some(MsgRing::AutoBuzzOff) => {
                         self.logEvent(LogEvent::new(LogEventType::DeviceAutoBuzzOff, "")).await;
-                        self.sendInternal(IntMsg::SetAutoBuzz(false)).await;
+                        self.sendInternal(IntMsg::SetDeviceAutoBuzz(false)).await;
                     }
                     Some(MsgRing::Ring { autoBuzz, timestamp }) => {
                         info!("Ring received at {} (auto buzz: {})", timestamp, autoBuzz);
@@ -156,12 +160,16 @@ impl MqttClient {
             IntMsg::GetDeviceLog => {
                 self.addToCommandQueue(MsgCmd::GetActionLog);
             }
-            IntMsg::SetAutoBuzz(autoBuzzOnOff) => {
+            IntMsg::SetDeviceAutoBuzz(autoBuzzOnOff) => {
                 if autoBuzzOnOff {
                     self.addToCommandQueue(MsgCmd::SetAutoBuzzOn);
                 } else {
                     self.addToCommandQueue(MsgCmd::SetAutoBuzzOff);
                 }
+            }
+            IntMsg::SetRuleAutoBuzz(activeByRule) => {
+                self.ruleAutoBuzz = Some(activeByRule);
+                self.queueRuleAutoBuzzState(activeByRule);
             }
             _ => {}
         }
@@ -170,6 +178,14 @@ impl MqttClient {
     pub async fn publishMessage(&self, topic: String, message: String) {
         if let Some(cb) = &self.publishCallback {
             cb(topic, message.into_bytes());
+        }
+    }
+
+    // Answers a command which is still waiting for its response as "not connected" when stopping the client.
+    pub async fn failPendingCommand(&mut self) {
+        if self.sendRecState == SendRecState::WaitForResponse {
+            info!("Connection lost while waiting for a response, answering as not connected.");
+            self.handleCommandResponse(ResponseKind::NotConnected, "[not_connected]").await;
         }
     }
 
@@ -283,10 +299,10 @@ impl MqttClient {
                 }
             }
             Ok(MsgResponse::AutoBuzzOn) => {
-                self.sendInternal(IntMsg::SetAutoBuzz(true)).await;
+                self.sendInternal(IntMsg::SetDeviceAutoBuzz(true)).await;
             }
             Ok(MsgResponse::AutoBuzzOff) => {
-                self.sendInternal(IntMsg::SetAutoBuzz(false)).await;
+                self.sendInternal(IntMsg::SetDeviceAutoBuzz(false)).await;
             }
             // Other responses with content
             _ => {
@@ -354,6 +370,14 @@ impl MqttClient {
         self.notifyNewCommand.notify_one();
     }
 
+    fn queueRuleAutoBuzzState(&mut self, activeByRule: bool) {
+        self.addToCommandQueue(if activeByRule {
+            MsgCmd::SetRuleAutoBuzzOn
+        } else {
+            MsgCmd::SetRuleAutoBuzzOff
+        });
+    }
+
     async fn sendInternal(&self, msg: IntMsg) {
         self.tx.send(msg).await.unwrap_or_default()
     }
@@ -362,28 +386,39 @@ impl MqttClient {
         self.logTx.send(event).await.unwrap_or_default()
     }
 
-    async fn setConnState(&mut self, state: ConnectionState) {
-        let justConnected = self.connState != ConnectionState::DeviceConnected && state == ConnectionState::DeviceConnected;
-        let justDisconnected = self.connState == ConnectionState::DeviceConnected && state != ConnectionState::DeviceConnected;
-        self.connState = state.clone();
-        info!("Connection state changed to: {}", state);
-        self.sendInternal(IntMsg::SetConnState(state.clone())).await;
+    async fn setConnState(&mut self, newState: ConnectionState) {
+        let justConnected = self.connState != ConnectionState::DeviceConnected && newState == ConnectionState::DeviceConnected;
+        let justDisconnected = self.connState == ConnectionState::DeviceConnected && newState != ConnectionState::DeviceConnected;
+
+        self.connState = newState.clone();
+        info!("Connection state changed to: {}", newState);
+        self.sendInternal(IntMsg::SetConnState(newState.clone())).await;
+
         if justConnected || justDisconnected {
             self.appState.write().await.volatileState.deviceStartTime = None;
             self.sendInternal(IntMsg::StateUpdate).await;
-        }
-        if justConnected {
-            self.logEvent(LogEvent::new(LogEventType::DeviceConnected, "")).await;
-            self.onDeviceConnected().await;
-        } else if justDisconnected {
-            self.logEvent(LogEvent::new(LogEventType::DeviceDisconnected, "")).await;
-            self.tsDeviceDisconnectedSince = Some(Utc::now());
+            if justConnected {
+                let hostInfo = format!(
+                    "MQTT host: {}",
+                    self.appState.read().await.volatileState.mqttHost.as_ref().unwrap_or(&"unknown".to_string())
+                );
+                self.logEvent(LogEvent::new(LogEventType::DeviceConnected, hostInfo)).await;
+                self.onDeviceConnected().await;
+            } else {
+                self.logEvent(LogEvent::new(LogEventType::DeviceDisconnected, "")).await;
+                self.tsDeviceDisconnectedSince = Some(Utc::now());
+            }
         }
     }
 
     async fn onDeviceConnected(&mut self) {
         // Get device start time
         self.addToCommandQueue(MsgCmd::GetStartTime);
+
+        // The rule auto-buzz state has to be resent after a reconnect.
+        if let Some(activeByRule) = self.ruleAutoBuzz {
+            self.queueRuleAutoBuzzState(activeByRule);
+        }
 
         // Check if we need a reboot (when the device is connected to its own MQTT broker instead of our).
         let connectedToForeignBroker = self.appState.read().await.volatileState.mqttHost.as_ref().is_some_and(|h| h != "localhost");

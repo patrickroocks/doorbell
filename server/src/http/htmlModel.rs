@@ -26,8 +26,8 @@ struct BaseTemplateFields {
     page_title: String,
     user_name: Option<String>,
     sse_disabled: bool,
-    auto_buzz_state: AutoBuzzState,      // auto-buzz state of the device
-    rule_auto_buzz_state: AutoBuzzState, // auto-buzz by an active rule
+    device_auto_buzz_state: AutoBuzzState, // auto-buzz state of the device
+    rule_auto_buzz_state: AutoBuzzState,   // auto-buzz by an active rule
     connection_state: ConnectionState,
     last_success_message: Option<String>,
     last_err_message: Option<String>,
@@ -118,6 +118,7 @@ struct RuleDisplayRow {
     pending_delete: bool,
     auto_ack: bool,
     single_shot: bool,
+    delete_at_end: bool,
     start_date: String,
     end_date: String,
     activation_time: String,
@@ -138,6 +139,7 @@ struct RuleFormView {
     enabled: bool,
     auto_ack: bool,
     single_shot: bool,
+    delete_at_end: bool,
     start_date: String,
     end_date: String,
     activation_time: String,
@@ -163,6 +165,7 @@ pub struct RuleForm {
     pub enabled: Option<String>,
     pub autoAck: Option<String>,
     pub singleShot: Option<String>,
+    pub deleteAtEnd: Option<String>,
     #[serde(default)]
     pub startDate: String,
     #[serde(default)]
@@ -207,7 +210,7 @@ impl HtmlModel {
                 page_title: "".to_string(),
                 user_name: None,
                 sse_disabled: false,
-                auto_buzz_state: AutoBuzzState::Unknown,
+                device_auto_buzz_state: AutoBuzzState::Unknown,
                 rule_auto_buzz_state: AutoBuzzState::Unknown,
                 connection_state: ConnectionState::Disconnected,
                 last_success_message: None,
@@ -233,8 +236,8 @@ impl HtmlModel {
         }
     }
 
-    pub fn setAutoBuzzState(&mut self, state: AutoBuzzState) {
-        self.baseFields.auto_buzz_state = state;
+    pub fn setDeviceAutoBuzzState(&mut self, state: AutoBuzzState) {
+        self.baseFields.device_auto_buzz_state = state;
     }
 
     pub fn setRuleAutoBuzzState(&mut self, state: AutoBuzzState) {
@@ -375,6 +378,7 @@ impl HtmlModel {
                 pending_delete: pendingDeleteIds.contains(&r.id),
                 auto_ack: r.autoAck,
                 single_shot: r.singleShot,
+                delete_at_end: r.deleteAtEnd,
                 start_date: r.startDateStr(),
                 end_date: r.endDateStr(),
                 activation_time: r.activationTimeStr(),
@@ -400,6 +404,7 @@ impl HtmlModel {
                     enabled: r.enabled,
                     auto_ack: r.autoAck,
                     single_shot: r.singleShot,
+                    delete_at_end: r.deleteAtEnd,
                     start_date: r.startDateStr(),
                     end_date: r.endDateStr(),
                     activation_time: r.activationTimeStr(),
@@ -418,6 +423,7 @@ impl HtmlModel {
                     enabled: true,
                     auto_ack: false,
                     single_shot: false,
+                    delete_at_end: false,
                     start_date: today.clone(),
                     end_date: today,
                     activation_time: NEW_RULE_ACTIVATION_TIME.to_string(),

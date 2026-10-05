@@ -403,7 +403,10 @@ h1 {
 
 .ServerLog {
     border-collapse: collapse;
-    width: 100%;
+    /* Fill the available width, but grow beyond it if the content needs more
+       space - the surrounding .TableScroll then scrolls horizontally. */
+    width: auto;
+    min-width: 100%;
     font-size: 13px;
 }
 
@@ -416,6 +419,29 @@ h1 {
 
 .ServerLog th {
     background: #f6f9ff;
+}
+
+.EventLog th,
+.EventLog td {
+    vertical-align: top;
+}
+
+/* Without this the auto table layout squeezes every column down to its minimal
+   width as soon as the space gets tight. Instead, time and event stay on one
+   line and the details column keeps a readable minimum, so the table grows
+   wider than .TableScroll and that one scrolls horizontally. */
+.EventLog th:nth-child(1),
+.EventLog td:nth-child(1),
+.EventLog th:nth-child(2),
+.EventLog td:nth-child(2) {
+    white-space: nowrap;
+}
+
+.EventLog th:nth-child(3),
+.EventLog td:nth-child(3) {
+    min-width: 22ch;
+    /* Details may wrap, but break inside a word rather than widen endlessly. */
+    overflow-wrap: anywhere;
 }
 
 /* Rules page */
@@ -450,6 +476,29 @@ h1 {
 
 .TableScroll {
     overflow-x: auto;
+}
+
+/* Ensure horizontal scrollbars */
+@media (hover: hover) and (pointer: fine) {
+    .TableScroll {
+        scrollbar-width: thin;
+        scrollbar-color: #9dc4f5 #eef4ff;
+        overflow-x: auto;
+    }
+
+    .TableScroll::-webkit-scrollbar {
+        height: 10px;
+    }
+
+    .TableScroll::-webkit-scrollbar-track {
+        background: #eef4ff;
+        border-radius: 5px;
+    }
+
+    .TableScroll::-webkit-scrollbar-thumb {
+        background: #9dc4f5;
+        border-radius: 5px;
+    }
 }
 
 .RuleToggleCell {
@@ -617,4 +666,12 @@ h1 {
     color: #0f3c73;
     border: 1px solid #a8cbf4;
     background: #eaf3ff;
+}
+
+.TimeInput {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
 }

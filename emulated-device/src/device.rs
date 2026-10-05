@@ -20,6 +20,9 @@ struct LogEntry {
 
 pub struct Device {
     pub autoBuzz: bool,
+    // A rule on the server is armed to buzz on a ring. The real device shows this on an LED and
+    // does nothing else with it; it is not persisted, the server re-sends it after a connect.
+    pub ruleAutoBuzz: bool,
     pub ringActive: bool,
     pub startTime: String,
     log: VecDeque<LogEntry>,
@@ -29,6 +32,7 @@ impl Device {
     pub fn new() -> Self {
         let mut dev = Device {
             autoBuzz: false,
+            ruleAutoBuzz: false,
             ringActive: false,
             startTime: Local::now().format(TIMESTAMP_FORMAT).to_string(),
             log: VecDeque::new(),
@@ -63,6 +67,15 @@ impl Device {
             Ok(MsgCmd::AutoBuzzOn) => self.setAutoBuzz(true, "mqtt"),
             Ok(MsgCmd::AutoBuzzOff) => self.setAutoBuzz(false, "mqtt"),
             Ok(MsgCmd::GetAutoBuzz) => vec![self.autoBuzzResponse()],
+            // Display only on the real device (LED): no response, no log entry.
+            Ok(MsgCmd::RuleAutoBuzzOn) => {
+                self.ruleAutoBuzz = true;
+                Vec::new()
+            }
+            Ok(MsgCmd::RuleAutoBuzzOff) => {
+                self.ruleAutoBuzz = false;
+                Vec::new()
+            }
             Ok(MsgCmd::TestRing) => self.ring(true, "mqtt"),
             Ok(MsgCmd::AckRing) => self.acknowledge(false, "mqtt"),
             Ok(MsgCmd::GetActionLog) => self.actionLogResponse(),

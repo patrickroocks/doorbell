@@ -21,5 +21,8 @@
         }
     ],
     "mqttClientId": "doorbellHttpServer",
-    "logRetentionDays": 180
+    "logRetentionDays": 180,
+    "apiTokens": [
+        "put-a-long-random-token-here"
+    ]
 }

@@ -19,9 +19,12 @@ public:
     StateGpioHandler* getStateGpioHandler();
 
 private:
-    NetworkHandler* networkHandler;
-    MqttHandler* mqttHandler;
-    StateGpioHandler* stateGpioHandler;
+    void waitForNextCycle();
 
-    bool startupCycleCompleted = false;
+    NetworkHandler* networkHandler = nullptr;
+    MqttHandler* mqttHandler = nullptr;
+    StateGpioHandler* stateGpioHandler = nullptr;
+
+    // Start of the next main loop cycle.
+    uint32_t nextCycleMs = 0;
 };

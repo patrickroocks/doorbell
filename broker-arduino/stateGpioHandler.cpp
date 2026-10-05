@@ -4,7 +4,6 @@
 #include "debouncedSwitch.h"
 #include "gpioConfig.h"
 #include "mqttHandler.h"
-#include "networkHandler.h"
 #include "timing.h"
 
 #include <EEPROM.h>
@@ -18,12 +17,12 @@ StateGpioHandler::StateGpioHandler(App* app)
     , switchAckBuzz(SwitchAckBuzz, SwitchDebounceCycles, app)
     , switchAck(SwitchAck, SwitchDebounceCycles, app)
     , inputRing(InputRing, InputDebounceCycles, app, true)
-    , timerDoorBuzzer(DoorOpenCycles)
-    , timerExtBell(ExtBellCycles)
-    , timerBellBlink(BellBlinkCycles)
-    , timerAckLedOn(AckLedCycles)
-    , timerErrorLedOn(ErrorLedCycles)
-    , timerReboot(RebootWaitCycles)
+    , timerDoorBuzzer(DoorOpenTimeMs)
+    , timerExtBell(ExtBellTimeMs)
+    , timerBellBlink(BellBlinkTimeMs)
+    , timerAckLedOn(AckLedTimeMs)
+    , timerErrorLedOn(ErrorLedTimeMs)
+    , timerReboot(RebootWaitTimeMs)
 {
     ledSeq = FirstLed;
 }
@@ -40,7 +39,6 @@ void StateGpioHandler::loop()
     readInputs();
     handleRelays();
     writeLedsInNormalLoop();
-    decrementTimers();
     checkForReboot();
 }
 
@@ -85,7 +83,6 @@ void StateGpioHandler::setup()
     Serial.println("Setup StateGpioHandler");
 
     mqttHandler = app->getMqttHandler();
-    networkHandler = app->getNetworkHandler();
     inputRing.setup();
 
     readEeprom();
@@ -122,8 +119,6 @@ void StateGpioHandler::readEeprom()
         Serial.println("Failed to initialize EEPROM");
         return;
     }
-
-    Serial.println(EEPROM.read(EepromAddressAutoBuzz));
     autoBuzz = EEPROM.read(EepromAddressAutoBuzz) == 1;
 }
 
@@ -166,6 +161,13 @@ void StateGpioHandler::setAutoBuzzState(bool newAutoBuzzState)
     writeEeprom();
 }
 
+void StateGpioHandler::setRuleAutoBuzzState(bool newRuleAutoBuzzState)
+{
+    // Server signales us, if "auto buzz by rule" is active.
+    // Not persisted. Server does the buzzing itsself.
+    ruleAutoBuzz = newRuleAutoBuzzState;
+}
+
 bool StateGpioHandler::getAutoBuzzState() const
 {
     return autoBuzz;
@@ -206,9 +208,8 @@ void StateGpioHandler::ackRingAndBuzzButton()
 
 void StateGpioHandler::initLedsAfterStartUp()
 {
-    digitalWrite(LED_BUILTIN, HIGH);
-    digitalWrite(LedOn, HIGH);
-    digitalWrite(Led3Unused, LOW);
+    digitalWrite(LED_BUILTIN, LOW);
+    digitalWrite(LedDeviceOn, HIGH);
     writeLedsInNormalLoop();
 }
 
@@ -219,6 +220,7 @@ void StateGpioHandler::writeLedsInNormalLoop()
     } else {
         digitalWrite(LedAckAutobuzz, autoBuzz ? HIGH : LOW);
     }
+    digitalWrite(LedRuleAutobuzz, ruleAutoBuzz ? HIGH : LOW);
     if (wantToReboot) {
         digitalWrite(LedError, blinkState);
     } else {
@@ -229,21 +231,31 @@ void StateGpioHandler::writeLedsInNormalLoop()
 
 void StateGpioHandler::readSwitches()
 {
-    if (switchBuzzMode.checkRaise()) {
-        setAutoBuzzState(!autoBuzz);
-    }
+    // Read all switches first: checkRaise() drives the debouncing, so it has to run for every
+    // switch in every cycle, no matter what we do with the result.
+    const bool raiseBuzzMode = switchBuzzMode.checkRaise();
+    const bool raiseAckBuzz = switchAckBuzz.checkRaise();
+    const bool raiseAck = switchAck.checkRaise();
 
-    if (switchAckBuzz.checkRaise()) {
-        ackRingAndBuzzButton();
-    }
-
-    if (switchAck.checkRaise()) {
-        ackRingButton();
-    }
+    const bool otherPressed = switchAckBuzz.isCurrentlyPressed() || switchAck.isCurrentlyPressed();
 
     // Reboot if all 3 buttons are pressed at the same time.
     if (switchBuzzMode.isCurrentlyPressed() && switchAckBuzz.isCurrentlyPressed() && switchAck.isCurrentlyPressed()) {
         reboot();
+    }
+
+    // No autobuzz change while another button is pressed - the user may be reaching for the
+    // reboot combination.
+    if (raiseBuzzMode && !otherPressed) {
+        setAutoBuzzState(!autoBuzz);
+    }
+
+    if (raiseAckBuzz) {
+        ackRingAndBuzzButton();
+    }
+
+    if (raiseAck) {
+        ackRingButton();
     }
 }
 
@@ -256,7 +268,7 @@ void StateGpioHandler::readInputs()
 
 void StateGpioHandler::handleRelays()
 {
-    // Never turn of both relays at the same time,
+    // Never turn on of both relays at the same time,
     // the power consumption is probably too high.
 
     // Scheduled -> Running - only if no other relay is running
@@ -278,17 +290,6 @@ void StateGpioHandler::handleRelays()
 
     digitalWrite(RelayBuzzer, stateDoorBuzzer == EventState::Running ? HIGH : LOW);
     digitalWrite(RelayExtBell, stateExtBell == EventState::Running ? HIGH : LOW);
-}
-
-void StateGpioHandler::decrementTimers()
-{
-    timerAckLedOn.decrement();
-    timerErrorLedOn.decrement();
-    timerDoorBuzzer.decrement();
-    timerExtBell.decrement();
-    timerBellBlink.decrement();
-    timerErrorLedOn.decrement();
-    timerReboot.decrement();
 }
 
 const CircularArray<String, MaxRawDataStrings>& StateGpioHandler::getArchivedRawDataStrings() const

@@ -6,12 +6,11 @@
 #include "stateGpioHandler.h"
 #include "timing.h"
 
-constexpr int NtpUpdateIntervalCycles = 10; // 1sec
-
 NetworkHandler::NetworkHandler(App* app)
     : app(app)
     , ntp(wifiUdp)
-    , ntpTimer(NtpUpdateIntervalCycles, true)
+    , ntpTimer(NtpUpdateIntervalMs, true)
+    , wifiReconnectTimer(WifiReconnectWaitTimeMs)
 {}
 
 String NetworkHandler::getDateTime()
@@ -29,9 +28,9 @@ void NetworkHandler::setup()
     Serial.println("Setup NetworkHandler");
 
     stateGpioHandler = app->getStateGpioHandler();
+    mqttHandler = app->getMqttHandler();
 
     wifiConnected = false;
-    startupCycleCompleted = false;
 
     auto wifiConfigs = getWifiConfigs();
 
@@ -50,36 +49,59 @@ void NetworkHandler::setup()
 
 void NetworkHandler::loop()
 {
-    // Reconnect wifi
-    if (WiFi.status() != WL_CONNECTED) {
-        wifiConnected = false;
-        Serial.println("Wifi disconnected, reboot...");
-        stateGpioHandler->reboot();
-        return;
-    }
+    if (!handleWifiConnection()) return;
 
-    // Loop NTP
-    if (wifiConnected) {
-        if (ntpTimer.checkAndDecrement()) ntp.update();
-        if (!validTime) {
-            validTime = ntp.year() != 1970;
-            if (logWhenValidTime) {
-                mqttHandler->addToActionLog("Received first NTP time");
-                logWhenValidTime = false;
-            }
+    // Loop NTP, regularly update time.
+    if (ntpTimer.checkEvent()) ntp.update();
+    if (!validTime) {
+        validTime = ntp.year() != 1970;
+        if (validTime && logWhenValidTime) {
+            mqttHandler->addToActionLog("Received first NTP time");
+            logWhenValidTime = false;
         }
     }
+}
+
+// Keeps track of the WiFi link.
+bool NetworkHandler::handleWifiConnection()
+{
+    if (WiFi.status() == WL_CONNECTED) {
+        if (wifiReconnectPending) {
+            Serial.println("WiFi reconnected.");
+            mqttHandler->addToActionLog("WiFi reconnected");
+            wifiReconnectPending = false;
+        }
+        wifiConnected = true;
+        return true;
+    }
+
+    wifiConnected = false;
+
+    if (!wifiReconnectPending) {
+        Serial.println("WiFi disconnected, trying to reconnect...");
+        wifiReconnectPending = true;
+        wifiReconnectTimer.start();
+        WiFi.reconnect();
+        return false;
+    }
+
+    if (wifiReconnectTimer.checkEvent()) {
+        // Fail over to next WiFI config.
+        Serial.println("WiFi reconnect failed, reboot...");
+        stateGpioHandler->reboot();
+    }
+    return false;
 }
 
 void NetworkHandler::setupWifiConn(const WifiConfig& wifiConfig)
 {
     WiFi.begin(wifiConfig.ssid.c_str(), wifiConfig.password.c_str());
     Serial.println("Connecting to WiFi '" + wifiConfig.ssid + "'");
-    int numCycles = 0;
+    const uint32_t deadlineMs = millis() + WifiConnectTimeoutMs;
     while (WiFi.status() != WL_CONNECTED) {
         stateGpioHandler->loopWaitCycle();
         Serial.print(".");
-        if (++numCycles > WifiTimeoutCycles) {
+        if ((int32_t) (millis() - deadlineMs) >= 0) {
             Serial.println("WiFi connection timeout for '" + wifiConfig.ssid + "'");
             return;
         }
@@ -110,5 +132,6 @@ bool NetworkHandler::hasValidTime() const
 
 void NetworkHandler::setRequestLogWhenValidTime()
 {
+    // Not yet a valid NTP time, log when we get a valid time.
     logWhenValidTime = true;
 }

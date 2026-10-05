@@ -11,7 +11,7 @@
     Device reboot time: <span class="InfoLabel">{{ device_reboot_time }}</span>
 </div>
 <div class="FunctionLine">
-    MQTT server: <span class="InfoLabel">{{ mqtt_server }}</span>
+    MQTT server (from the service, not the device): <span class="InfoLabel">{{ mqtt_server }}</span>
 </div>
 <div class="FunctionLine">
     <form action="/reboot" method="post" onsubmit="return confirm('Do you really want to reboot the device?');">

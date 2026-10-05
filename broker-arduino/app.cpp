@@ -60,8 +60,20 @@ void App::setup()
 
 void App::loop()
 {
-    delay(MainLoopSampleTimeMs);
+    waitForNextCycle();
     networkHandler->loop();
     mqttHandler->loop();
     stateGpioHandler->loop();
+}
+
+void App::waitForNextCycle()
+{
+    const uint32_t now = millis();
+    const int32_t remainingMs = (int32_t) (nextCycleMs - now);
+    if (remainingMs > 0) {
+        delay(remainingMs);
+    } else {
+        nextCycleMs = now;
+    }
+    nextCycleMs += MainLoopSampleTimeMs;
 }

@@ -27,6 +27,9 @@ pub struct ConfigFileFormat {
     pub mqttClientId: String,
     #[serde(default = "defaultLogRetentionDays")]
     pub logRetentionDays: u32,
+    // Tokens accepted by the rule API, see http/httpApi.rs. Without a token there is no API at all.
+    #[serde(default)]
+    pub apiTokens: Vec<String>,
 }
 
 pub struct ConfigStore {
@@ -35,6 +38,7 @@ pub struct ConfigStore {
     pub mqttServers: Vec<MqttServerInfo>,
     pub mqttClientId: String,
     pub logRetentionDays: u32,
+    pub apiTokens: Vec<String>,
 }
 
 impl ConfigStore {
@@ -58,6 +62,7 @@ impl ConfigStore {
             mqttServers: config.mqttServers,
             mqttClientId: config.mqttClientId,
             logRetentionDays: config.logRetentionDays,
+            apiTokens: config.apiTokens,
         }
     }
 

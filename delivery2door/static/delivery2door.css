@@ -1,0 +1,677 @@
+* {
+    /* Use padding and border size for the element's total width and height */
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: Verdana, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    color: black;
+    background: linear-gradient(0deg, #f9fbff 100%, #d4e6ff 0%);
+}
+
+.PageShell {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    box-sizing: border-box;
+}
+
+.Layout {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    flex: 1;
+}
+
+#sidebar {
+    width: 280px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+}
+
+.SidebarBox {
+    background: #e8f3ff;
+    border: 1px solid #c5defa;
+    border-radius: 10px;
+    padding: 10px;
+}
+
+.SidebarHeading {
+    font-weight: bold;
+    margin-bottom: 8px;
+    letter-spacing: 0.2px;
+    color: #0f3c73;
+}
+
+.SidebarBody {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.SystemGrid {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 6px 10px;
+    align-items: start;
+}
+
+.SystemLabel {
+    color: #0f3c73;
+    text-align: right;
+    padding-right: 6px;
+}
+
+.SidebarLine {
+    line-height: 1.4;
+}
+
+.SidebarNav a {
+    display: block;
+    padding: 4px 8px;
+    background: white;
+    border: 1px solid #d5e6ff;
+    border-radius: 10px;
+    color: #0f3c73;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.SidebarNav a:hover {
+    background: #f2f7ff;
+    border-color: #b5d2ff;
+}
+
+.SidebarNav a:active {
+    transform: translateY(1px);
+}
+
+.Content {
+    flex: 1;
+    width: 100%;
+    background: white;
+    border-radius: 10px;
+    border: 1px solid #CCCCCC;
+    padding: 10px;
+    box-sizing: border-box;
+    min-width: 0;
+}
+
+.Content h1 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    color: #0f3c73;
+}
+
+h1 {
+    font-size: 18px;
+}
+
+.AuthContainer {
+    max-width: 420px;
+    margin: 0 auto;
+    padding: 10px;
+    background: #f6f9ff;
+    border: 1px solid #d5e6ff;
+    border-radius: 12px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.AuthForm {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.AuthGrid {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 10px 12px;
+    align-items: center;
+}
+
+.AuthLabel {
+    font-weight: 600;
+    color: #0f3c73;
+}
+
+.AuthInput {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #c5d7f2;
+    border-radius: 10px;
+    background: white;
+    font-size: 14px;
+    box-sizing: border-box;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.AuthInput:focus {
+    outline: none;
+    border-color: #0f7ae5;
+    box-shadow: 0 0 0 3px rgba(15, 122, 229, 0.15);
+}
+
+
+.AuthGrid {
+    width: auto;
+    justify-self: start;
+    padding-left: 16px;
+    padding-right: 16px;
+}
+
+.footer {
+    margin-top: 12px;
+    padding: 12px 8px;
+    text-align: center;
+    color: #4a6076;
+    font-size: 13px;
+    border-top: 1px solid #d5e2f3;
+}
+
+.LastSuccessMessage {
+    font-size: 13px;
+    color: #0f6b29;
+    margin-bottom: 4px;
+    border: 1px solid #7ddaa3;
+    background: #e8f9ef;
+    padding: 8px;
+    border-radius: 10px;
+}
+
+.LastErrMessage {
+    font-size: 13px;
+    color: #9d1c1c;
+    margin-bottom: 4px;
+    border: 1px solid #f4a8a8;
+    background: #ffecec;
+    padding: 8px;
+    border-radius: 10px;
+}
+
+.SmallMarker {
+    background-color: #6b7280;
+    color: white;
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.SmallInfoText {
+    font-size: 12px;
+    color: gray;
+}
+
+@media (max-width: 700px) {
+    .Layout {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    #sidebar {
+        width: 100%;
+    }
+
+    .SidebarNav a {
+        text-align: center;
+    }
+
+    .RuleTable {
+        font-size: 12px;
+    }
+
+    .RuleTable th,
+    .RuleTable td {
+        padding: 4px 6px;
+    }
+}
+
+@media (max-width: 500px) {
+    body {
+        font-size: 16px;
+    }
+
+    .PageShell {
+        padding: 12px;
+    }
+
+    .Content {
+        padding: 16px;
+        width: 100%;
+    }
+
+    .AuthGrid {
+        grid-template-columns: 1fr;
+    }
+
+    .AuthGrid .AuthPrimaryButton {
+        width: 100%;
+        justify-self: stretch;
+    }
+}
+
+/* Buttons, Option-Fields */
+
+.Button {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    background: #0f7ae5;
+    color: white;
+    border-radius: 10px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.1s ease;
+}
+
+.Select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #c5d7f2;
+    border-radius: 10px;
+    background: white;
+    color: #0f3c73;
+    font-size: 15px;
+    font-family: inherit;
+    margin-top: 6px;
+    margin-bottom: 6px;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    box-sizing: border-box;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+}
+
+.Select:focus {
+    outline: none;
+    border-color: #0f7ae5;
+    box-shadow: 0 0 0 3px rgba(15, 122, 229, 0.15);
+}
+
+.Button:hover {
+    background: #0d69c4;
+}
+
+.Button:active {
+    transform: translateY(1px);
+}
+
+/* Function buttons */
+
+.FunctionLine {
+    padding: 6px 0px;
+}
+
+/* Status styles */
+
+.StateDot,
+.DotRed,
+.DotOrange,
+.DotGreen,
+.DotGrey,
+.DotQuestion {
+    height: 12px;
+    width: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 6px;
+}
+
+.DotRed {
+    background-color: #e74c3c;
+}
+
+.DotOrange {
+    background-color: #f39c12;
+}
+
+.DotGreen {
+    background-color: #2ecc71;
+}
+
+.DotGrey {
+    background-color: #7f8c8d;
+}
+
+.DotQuestion {
+    background-color: #95a5a6;
+    position: relative;
+}
+
+.DotQuestion::after {
+    content: "?";
+    color: white;
+    font-size: 10px;
+    font-weight: bold;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    line-height: 1;
+    pointer-events: none;
+}
+
+.InfoLabel {
+    color: black;
+    padding: 4px;
+    border: 1px solid #c5defa;
+}
+
+.DeviceLog {
+    font-family: monospace;
+    font-size: 13px;
+    background: #f6f9ff;
+    border: 1px solid #d5e6ff;
+    border-radius: 10px;
+    padding: 10px;
+    max-height: 400px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+}
+
+.ServerLogInfo {
+    color: #555;
+    font-size: 13px;
+}
+
+.ServerLogLegend {
+    border-collapse: collapse;
+    margin-bottom: 14px;
+    color: #555;
+    font-size: 12px;
+}
+
+.ServerLogLegend td {
+    padding: 2px 10px 2px 0;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.ServerLog {
+    border-collapse: collapse;
+    /* Fill the available width, but grow beyond it if the content needs more
+       space - the surrounding .TableScroll then scrolls horizontally. */
+    width: auto;
+    min-width: 100%;
+    font-size: 13px;
+}
+
+.ServerLog th,
+.ServerLog td {
+    text-align: left;
+    padding: 4px 10px;
+    border-bottom: 1px solid #e2ecfb;
+}
+
+.ServerLog th {
+    background: #f6f9ff;
+}
+
+.EventLog th,
+.EventLog td {
+    vertical-align: top;
+}
+
+/* Without this the auto table layout squeezes every column down to its minimal
+   width as soon as the space gets tight. Instead, time and event stay on one
+   line and the details column keeps a readable minimum, so the table grows
+   wider than .TableScroll and that one scrolls horizontally. */
+.EventLog th:nth-child(1),
+.EventLog td:nth-child(1),
+.EventLog th:nth-child(2),
+.EventLog td:nth-child(2) {
+    white-space: nowrap;
+}
+
+.EventLog th:nth-child(3),
+.EventLog td:nth-child(3) {
+    min-width: 22ch;
+    /* Details may wrap, but break inside a word rather than widen endlessly. */
+    overflow-wrap: anywhere;
+}
+
+/* Rules page */
+
+.ButtonInline {
+    width: auto;
+    display: inline-block;
+    text-align: center;
+    text-decoration: none;
+    padding: 8px 14px;
+}
+
+.ButtonSecondary {
+    background: #7f8c8d;
+}
+
+.ButtonSecondary:hover {
+    background: #6c797a;
+}
+
+.RuleToolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.RuleToolbar form {
+    margin: 0;
+}
+
+.TableScroll {
+    overflow-x: auto;
+}
+
+/* Ensure horizontal scrollbars */
+@media (hover: hover) and (pointer: fine) {
+    .TableScroll {
+        scrollbar-width: thin;
+        scrollbar-color: #9dc4f5 #eef4ff;
+        overflow-x: auto;
+    }
+
+    .TableScroll::-webkit-scrollbar {
+        height: 10px;
+    }
+
+    .TableScroll::-webkit-scrollbar-track {
+        background: #eef4ff;
+        border-radius: 5px;
+    }
+
+    .TableScroll::-webkit-scrollbar-thumb {
+        background: #9dc4f5;
+        border-radius: 5px;
+    }
+}
+
+.RuleToggleCell {
+    white-space: nowrap;
+}
+
+.RuleToggleCell form {
+    display: inline;
+    margin: 0;
+}
+
+.RuleToggleCell .StateDot {
+    margin-left: 8px;
+    margin-right: 0;
+    vertical-align: middle;
+}
+
+.ToggleSwitch {
+    position: relative;
+    width: 46px;
+    height: 26px;
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    padding: 0;
+    vertical-align: middle;
+    transition: background 0.2s ease;
+}
+
+.ToggleSwitch::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: white;
+    font-size: 13px;
+    font-weight: bold;
+    line-height: 20px;
+    text-align: center;
+    transition: left 0.2s ease;
+}
+
+.ToggleOn {
+    background: #0f7ae5;
+}
+
+.ToggleOn::after {
+    content: "✓";
+    left: 23px;
+    color: #0f7ae5;
+}
+
+.ToggleOff {
+    background: #b6bec9;
+}
+
+.ToggleOff::after {
+    content: "✕";
+    left: 3px;
+    color: #7f8c8d;
+}
+
+.RuleTimeSpan {
+    white-space: nowrap;
+}
+
+.RuleActions {
+    white-space: nowrap;
+}
+
+.RuleActions a,
+.RuleActions button {
+    text-decoration: none;
+    font-size: 16px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0 4px;
+}
+
+.RuleActions form {
+    display: inline;
+    margin: 0;
+}
+
+.RuleFormGrid {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 10px 12px;
+    align-items: center;
+    max-width: 480px;
+    margin-bottom: 16px;
+}
+
+.RuleFormGrid input[type="checkbox"] {
+    justify-self: start;
+    width: 18px;
+    height: 18px;
+}
+
+.RuleFormButtons {
+    display: flex;
+    gap: 10px;
+}
+
+.RuleDateField {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.ShortcutRuleForm {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.HoursInput {
+    width: 60px;
+    padding: 8px;
+    text-align: center;
+}
+
+.StepButton {
+    flex: none;
+    width: 28px;
+    height: 28px;
+    border: 1px solid #c5d7f2;
+    border-radius: 8px;
+    background: #f2f7fe;
+    color: #0f3c73;
+    font-size: 16px;
+    font-weight: bold;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.StepButton:hover {
+    background: #e1ecfb;
+    border-color: #0f7ae5;
+}
+
+.StepButton:active {
+    transform: translateY(1px);
+}
+
+/* Hints below the date/time rows, spanning label and input column. */
+.RuleFormHint {
+    grid-column: 1 / -1;
+    font-size: 13px;
+    padding: 6px 8px;
+    border-radius: 8px;
+}
+
+.RuleFormWarning {
+    color: #9d1c1c;
+    border: 1px solid #f4a8a8;
+    background: #ffecec;
+}
+
+.RuleFormInfo {
+    color: #0f3c73;
+    border: 1px solid #a8cbf4;
+    background: #eaf3ff;
+}
+
+.TimeInput {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}

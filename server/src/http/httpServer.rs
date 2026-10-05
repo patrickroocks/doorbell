@@ -1,7 +1,8 @@
 use crate::appState::MtxAppState;
-use crate::common::{AutoBuzzState, ConnectionState, IntMsg, ToStateInfo, UserSettings};
+use crate::common::{AppInfo, AutoBuzzState, ConnectionState, IntMsg, ToStateInfo, UserSettings};
 use crate::configStore::ConfigStore;
 use crate::http::htmlModel::{HtmlModel, LoginForm, RuleForm, RuleIdForm, ShortcutRuleForm};
+use crate::http::httpApi;
 use crate::http::httpSession::SessionManager;
 use crate::logger::eventTypes::{LogEvent, LogEventType};
 use crate::logger::loggerService::LogQueryService;
@@ -9,9 +10,10 @@ use crate::rules::rule::Rule;
 use crate::rules::ruleService::{PendingRemovals, RulesChangedFlag};
 use crate::rules::ruleStore::RuleStore;
 use crate::util::notifyWithState::NotifyWithState;
+use crate::util::time::formatLocal;
 
 use axum::{
-    Router,
+    Json, Router,
     extract::{Form, Query, State},
     response::{
         Html, IntoResponse, Redirect,
@@ -21,10 +23,12 @@ use axum::{
 };
 use chrono::{DateTime, Local, Timelike, Utc};
 use futures::stream::{self, Stream, StreamExt};
+use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use tokio::sync::{Mutex, mpsc};
+use tokio::time::Duration;
 use tower_cookies::{CookieManagerLayer, Cookies};
 use tower_http::services::ServeDir;
 use tracing::{error, info};
@@ -33,6 +37,10 @@ use tracing::{error, info};
 // hours input on the rules page.
 const SHORTCUT_MIN_HOURS: u32 = 1;
 const SHORTCUT_MAX_HOURS: u32 = 23;
+
+// How long a device log request waits for the answer of the device. Longer than the command
+// timeout of the MQTT client, which normally answers first - this is only the last resort.
+const DUR_DEVICE_LOG_TIMEOUT: Duration = Duration::from_secs(10);
 
 // ------------------ Http Server State ----------------------
 
@@ -55,34 +63,48 @@ impl DiagonsticData {
     }
 }
 
-struct HttpState {
+// Answer of the public `/serviceState` route. Carries only what a status page needs - nothing
+// here says anything about the users, the rules or the door itself.
+#[derive(Serialize)]
+struct ServiceStateResponse {
+    serviceStartTime: String,
+    connectionState: String,
+    mqttServer: String,
+    version: String,
+    // When the running binary was built. Two deployments of the same version are only
+    // distinguishable by this, so a monitor can tell a stale binary from an up-to-date one.
+    buildTime: String,
+}
+
+// Shared with `httpApi`, which serves the rule API from the same state.
+pub(crate) struct HttpState {
     tx: mpsc::Sender<IntMsg>,
-    logTx: mpsc::Sender<LogEvent>,
+    pub(crate) logTx: mpsc::Sender<LogEvent>,
     logQuery: LogQueryService,
-    autoBuzzState: AutoBuzzState,
-    autoBuzzStateNotify: Arc<tokio::sync::Notify>,
+    deviceAutoBuzzState: AutoBuzzState,
+    deviceAutoBuzzStateNotify: Arc<tokio::sync::Notify>,
     // Auto-buzz by an active rule, reported by the RuleService. Independent of the device state above.
     ruleAutoBuzzState: AutoBuzzState,
     ruleAutoBuzzStateNotify: Arc<tokio::sync::Notify>,
     connState: ConnectionState,
     connStateNotify: Arc<tokio::sync::Notify>,
     sessionManager: Arc<SessionManager>,
-    cfg: Arc<ConfigStore>,
+    pub(crate) cfg: Arc<ConfigStore>,
     diagData: DiagonsticData,
     deviceLog: Vec<String>,
     waitingForLog: bool,
     deviceLogNotify: Arc<tokio::sync::Notify>,
-    ruleStore: RuleStore,
-    rulesChanged: RulesChangedFlag,
+    pub(crate) ruleStore: RuleStore,
+    pub(crate) rulesChanged: RulesChangedFlag,
     // Single-shot rules which have just fired and are about to be deleted by the RuleService.
     pendingRemovals: PendingRemovals,
 }
 
 impl HttpState {
-    fn setAutoBuzzState(&mut self, newState: AutoBuzzState) {
-        if self.autoBuzzState != newState {
-            self.autoBuzzState = newState;
-            self.autoBuzzStateNotify.notify_waiters();
+    fn setDeviceAutoBuzzState(&mut self, newState: AutoBuzzState) {
+        if self.deviceAutoBuzzState != newState {
+            self.deviceAutoBuzzState = newState;
+            self.deviceAutoBuzzStateNotify.notify_waiters();
         }
     }
 
@@ -99,7 +121,7 @@ impl HttpState {
             self.connState = newState;
             self.connStateNotify.notify_waiters();
             if self.connState != ConnectionState::DeviceConnected {
-                self.setAutoBuzzState(AutoBuzzState::Unknown);
+                self.setDeviceAutoBuzzState(AutoBuzzState::Unknown);
             }
         }
     }
@@ -137,8 +159,8 @@ impl HttpServer {
             tx: tx,
             logTx: logTx,
             logQuery: logQuery,
-            autoBuzzState: AutoBuzzState::Unknown,
-            autoBuzzStateNotify: Arc::new(tokio::sync::Notify::new()),
+            deviceAutoBuzzState: AutoBuzzState::Unknown,
+            deviceAutoBuzzStateNotify: Arc::new(tokio::sync::Notify::new()),
             ruleAutoBuzzState: AutoBuzzState::Unknown,
             ruleAutoBuzzStateNotify: Arc::new(tokio::sync::Notify::new()),
             connState: ConnectionState::Disconnected,
@@ -181,11 +203,22 @@ impl HttpServer {
             .route("/shortcutRule", post(Self::handleShortcutRule))
             .route("/toggleAutoBuzz", post(Self::toggleAutoBuzz))
             // # States & their streams
-            .route("/autoBuzzStateStream", get(Self::getAutoBuzzStateStream))
+            .route("/deviceAutoBuzzStateStream", get(Self::getDeviceAutoBuzzStateStream))
             .route("/ruleAutoBuzzStateStream", get(Self::getRuleAutoBuzzStateStream))
             .route("/connStateStream", get(Self::getConnStateStream))
             .route("/deviceLogStream", get(Self::getDeviceLogStream))
             .route_layer(axum::middleware::from_fn_with_state(self.state.clone(), Self::requireSession));
+
+        // Rule API for other services (delivery2door). Guarded by a token instead of a session, and
+        // completely absent unless a token is configured - an unconfigured server cannot be driven
+        // from outside at all.
+        let apiRoutes = if self.state.lock().await.cfg.apiTokens.is_empty() {
+            info!("No apiTokens configured, the rule API is disabled");
+            Router::new()
+        } else {
+            info!("Rule API enabled under /api");
+            httpApi::apiRouter(self.state.clone())
+        };
 
         // The pages render the "not logged in" page themselves (see `startHtmlModel`), so they stay
         // reachable without a session - as does the login itself.
@@ -200,7 +233,11 @@ impl HttpServer {
             .route("/rules", get(Self::showRulesPage))
             .route("/editRule", get(Self::showEditRulePage))
             .route("/doLogin", post(Self::handleLogin))
+            // # Public state, no session needed
+            .route("/serviceState", get(Self::getServiceState))
             .merge(protectedRoutes)
+            // # Rule API for other services
+            .merge(apiRoutes)
             // # Static files (like CSS)
             .nest_service("/static", ServeDir::new("static"))
             // # State & Cookies
@@ -217,7 +254,8 @@ impl HttpServer {
                 return;
             }
         };
-        let server = axum::serve(listener, app);
+        // With connect info, so a rejected API request can name the caller's address in the log.
+        let server = axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>());
 
         let cancelNotifyClone = self.cancelNotify.clone();
         let mut serverTask = tokio::spawn(async move {
@@ -253,16 +291,15 @@ impl HttpServer {
             }
         }
 
-        // Stop accepting requests. Without this the server would keep serving - and keep sending
-        // device commands - while the MQTT and rule tasks are already shutting down.
+        // Stop accepting requests on shut down.
         serverTask.abort();
     }
 
     pub async fn handleInternalMessage(&mut self, message: IntMsg) {
         let mut state = self.state.lock().await;
         match message {
-            IntMsg::SetAutoBuzz(onOff) => {
-                state.setAutoBuzzState(if onOff { AutoBuzzState::On } else { AutoBuzzState::Off });
+            IntMsg::SetDeviceAutoBuzz(onOff) => {
+                state.setDeviceAutoBuzzState(if onOff { AutoBuzzState::On } else { AutoBuzzState::Off });
             }
             IntMsg::SetRuleAutoBuzz(onOff) => {
                 state.setRuleAutoBuzzState(if onOff { AutoBuzzState::On } else { AutoBuzzState::Off });
@@ -306,7 +343,7 @@ impl HttpServer {
             htmlModel.setMqttServer(diagData.mqttServer.clone());
             htmlModel.setSelectedUpdateBehavior(session.userSettings.updateBehavior.clone());
             htmlModel.setConnectionState(httpState.connState.clone());
-            htmlModel.setAutoBuzzState(httpState.autoBuzzState.clone());
+            htmlModel.setDeviceAutoBuzzState(httpState.deviceAutoBuzzState.clone());
             htmlModel.setRuleAutoBuzzState(httpState.ruleAutoBuzzState.clone());
             return htmlModel;
         }
@@ -350,6 +387,30 @@ impl HttpServer {
         }
 
         return htmlModel.renderDiagnosticsPage();
+    }
+
+    // ----------------- Route service state handler ----------------------
+
+    // Readable without a session, so an external monitor can see whether the service is alive and
+    // talking to the device without holding credentials.
+    async fn getServiceState(State(state): State<Arc<Mutex<HttpState>>>) -> Json<ServiceStateResponse> {
+        let state = state.lock().await;
+        Json(ServiceStateResponse {
+            serviceStartTime: formatLocal(state.diagData.serviceStartTime),
+            connectionState: state.connState.to_string(),
+            mqttServer: state.diagData.mqttServer.clone().unwrap_or("Unknown".to_string()),
+            version: AppInfo::VERSION.to_string(),
+            buildTime: Self::formattedBuildTime(),
+        })
+    }
+
+    // `BUILD_TIMESTAMP` is RFC3339 as `build.rs` wrote it; the route reports it in the same wall
+    // clock format as every other time, and falls back to the raw value rather than failing.
+    fn formattedBuildTime() -> String {
+        match DateTime::parse_from_rfc3339(AppInfo::BUILD_TIMESTAMP) {
+            Ok(t) => formatLocal(Some(t.with_timezone(&Utc))),
+            Err(_) => AppInfo::BUILD_TIMESTAMP.to_string(),
+        }
     }
 
     // ----------------- Routes for device log (fetched from the device) handler ----------------------
@@ -425,8 +486,15 @@ impl HttpServer {
 
     // ---------------------- Routes for status updates ----------------------
 
-    async fn getAutoBuzzStateStream(State(state): State<Arc<Mutex<HttpState>>>) -> Sse<impl Stream<Item = Result<Event, std::io::Error>>> {
-        Self::getStreamByNotifier(state, |s| s.autoBuzzStateNotify.clone(), |s| s.autoBuzzState.toStateInfo().toJson()).await
+    async fn getDeviceAutoBuzzStateStream(
+        State(state): State<Arc<Mutex<HttpState>>>,
+    ) -> Sse<impl Stream<Item = Result<Event, std::io::Error>>> {
+        Self::getStreamByNotifier(
+            state,
+            |s| s.deviceAutoBuzzStateNotify.clone(),
+            |s| s.deviceAutoBuzzState.toStateInfo().toJson(),
+        )
+        .await
     }
 
     async fn getRuleAutoBuzzStateStream(
@@ -445,6 +513,12 @@ impl HttpServer {
     }
 
     async fn getDeviceLogStream(State(state): State<Arc<Mutex<HttpState>>>) -> Sse<impl Stream<Item = Result<Event, std::io::Error>>> {
+        // Subscribe before asking for the log
+        let notify = state.lock().await.deviceLogNotify.clone();
+        let notified = notify.notified();
+        tokio::pin!(notified);
+        notified.as_mut().enable();
+
         // Start receiving the log unless already waiting, will be delivered via SSE
         {
             let mut state = state.lock().await;
@@ -454,18 +528,27 @@ impl HttpServer {
                 Self::sendToDevice(&state, IntMsg::GetDeviceLog).await;
             }
         }
-        // The stream. Lines are joined with "\n" and rendered as text by the page - the log comes
-        // from the device and must not end up in the DOM as markup.
-        Self::getUpdatesOnlyStreamByNotifier(state, |s| s.deviceLogNotify.clone(), |s| s.deviceLog.join("\n")).await
+
+        // Lines are joined with "\n" and rendered as text by the page.
+        // The timeout gives up the waiting state.
+        let logContent = match tokio::time::timeout(DUR_DEVICE_LOG_TIMEOUT, notified).await {
+            Ok(()) => state.lock().await.deviceLog.join("\n"),
+            Err(_) => {
+                error!("No device log received within {} seconds", DUR_DEVICE_LOG_TIMEOUT.as_secs());
+                state.lock().await.waitingForLog = false;
+                "[no answer from the device]".to_string()
+            }
+        };
+        Sse::new(stream::once(async move { Ok(Event::default().data(logContent)) }))
     }
 
     async fn toggleAutoBuzz(State(state): State<Arc<Mutex<HttpState>>>, cookies: Cookies) -> Redirect {
         let mut state = state.lock().await;
-        if state.autoBuzzState != AutoBuzzState::Unknown {
-            let switchOn = state.autoBuzzState == AutoBuzzState::Off;
+        if state.deviceAutoBuzzState != AutoBuzzState::Unknown {
+            let switchOn = state.deviceAutoBuzzState == AutoBuzzState::Off;
             // Go "Unknown" until the device confirms the new state.
-            state.autoBuzzState = AutoBuzzState::Unknown;
-            Self::sendToDevice(&state, IntMsg::SetAutoBuzz(switchOn)).await;
+            state.deviceAutoBuzzState = AutoBuzzState::Unknown;
+            Self::sendToDevice(&state, IntMsg::SetDeviceAutoBuzz(switchOn)).await;
             let eventType = if switchOn {
                 LogEventType::UserAutoBuzzOn
             } else {
@@ -635,42 +718,27 @@ impl HttpServer {
             Redirect::to(&backToForm).into_response()
         };
 
-        // Activation and deactivation times are required; equal times would describe a zero-length
-        // window, i.e. a rule that can never activate.
-        let (activation, deactivation) = match (Rule::parseTime(&form.activationTime), Rule::parseTime(&form.deactivationTime)) {
-            (Some(a), Some(d)) if a != d => (a, d),
-            (Some(_), Some(_)) => return backWithError("Activation and deactivation time must differ").await,
-            _ => return backWithError("Activation and deactivation time are required").await,
-        };
-
-        // Both dates are optional ("no limit"), but an unparsable one is rejected instead of being
-        // treated as "no limit", which would widen the rule instead of failing.
-        let (startDate, endDate) = match (Rule::parseDateField(&form.startDate), Rule::parseDateField(&form.endDate)) {
-            (Some(s), Some(e)) => (s, e),
-            _ => return backWithError("Start and end date must be empty or a valid date").await,
-        };
-        if let (Some(start), Some(end)) = (startDate, endDate)
-            && end < start
-        {
-            return backWithError("End date is earlier than start date").await;
-        }
-
         let name = if form.name.trim().is_empty() {
             state.ruleStore.nextUnnamedName()
         } else {
             form.name.trim().to_string()
         };
 
-        let rule = Rule {
-            id: ruleId.unwrap_or(0),
+        // Same validation as the API uses, so the two cannot drift apart.
+        let rule = match Rule::fromParts(
+            ruleId,
             name,
-            enabled: form.enabled.is_some(),
-            autoAck: form.autoAck.is_some(),
-            singleShot: form.singleShot.is_some(),
-            startDate,
-            endDate,
-            activationTime: activation,
-            deactivationTime: deactivation,
+            form.enabled.is_some(),
+            form.autoAck.is_some(),
+            form.singleShot.is_some(),
+            form.deleteAtEnd.is_some(),
+            &form.startDate,
+            &form.endDate,
+            &form.activationTime,
+            &form.deactivationTime,
+        ) {
+            Ok(rule) => rule,
+            Err(e) => return backWithError(&e).await,
         };
 
         // Report a failed write instead of claiming success: the rule may have been deleted
@@ -760,6 +828,8 @@ impl HttpServer {
             enabled: true,
             autoAck: true,
             singleShot: true,
+            // The rule removes itself on the first ring, so there is no lifetime to end.
+            deleteAtEnd: false,
             startDate: Some(now.date_naive()),
             // Both dates are the day the window *starts* on - for a window running past midnight
             // the part after midnight belongs to the window started today, see `Rule::isActiveAt`.
@@ -793,32 +863,6 @@ impl HttpServer {
     }
 
     // ---------------------- Route handling helper ----------------------
-
-    // Helper for route endpoints for SSE streams without initial event
-    async fn getUpdatesOnlyStreamByNotifier<F, G>(
-        state: Arc<Mutex<HttpState>>,
-        notifyFunc: F,
-        dataFunc: G,
-    ) -> Sse<impl Stream<Item = Result<Event, std::io::Error>>>
-    where
-        F: FnOnce(&HttpState) -> Arc<tokio::sync::Notify>,
-        G: FnOnce(&HttpState) -> String,
-    {
-        // Get the notify handle without holding the lock
-        let notify = {
-            let state = state.lock().await;
-            notifyFunc(&state)
-        };
-
-        notify.notified().await;
-
-        let data = {
-            let state = state.lock().await;
-            dataFunc(&state)
-        };
-        let stream = stream::once(async move { Ok(Event::default().data(data)) });
-        Sse::new(stream)
-    }
 
     // Helper for route endpoints for SSE streams with initial event
     async fn getStreamByNotifier<F, G>(

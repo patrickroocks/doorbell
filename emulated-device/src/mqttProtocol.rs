@@ -25,6 +25,10 @@ pub enum MsgCmd {
     AutoBuzzOff,
     #[strum(serialize = "getAutoBuzz")]
     GetAutoBuzz,
+    #[strum(serialize = "ruleAutoBuzzOn")]
+    RuleAutoBuzzOn,
+    #[strum(serialize = "ruleAutoBuzzOff")]
+    RuleAutoBuzzOff,
     #[strum(serialize = "testRing")]
     TestRing,
     #[strum(serialize = "ackRing")]

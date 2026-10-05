@@ -7,7 +7,9 @@
 #include <EmbeddedMqttBroker.h>
 #include <PubSubClient.h>
 
-constexpr int ActionLogSize = 50;
+constexpr int ActionLogSize = 20;
+constexpr int OutboxSize = 8;
+constexpr int MultiResponseLinesPerLoop = 10;
 
 class App;
 class StateGpioHandler;
@@ -26,7 +28,6 @@ public:
     void writeAutoBuzzStateToLogAndMqtt(bool newAutoBuzzState);
     void writeAckRingToMqtt();
     void writeDeviceBuzzToMqtt();
-    bool getMqttConnected() const;
     void addToActionLog(const String& action);
 
 private:
@@ -38,8 +39,35 @@ private:
     void tryToConnectToCurrentConfig();
 
     void callbackMqtt(char* topic, byte* payload, unsigned int length);
-    void showActionLog();
-    void showRawData();
+
+    // A message to be published.
+    struct OutboundMessage final
+    {
+        OutboundMessage() = default;
+        OutboundMessage(const char* topic, const String& payload)
+            : topic(topic)
+            , payload(payload)
+        {}
+
+        const char* topic = nullptr;
+        String payload;
+    };
+
+    // A multi line response that is currently being sent out, line by line.
+    enum class MultiResponse
+    {
+        None,
+        ActionLog,
+        RawData,
+    };
+
+    // Publishing.
+    void enqueueMessage(const char* topic, const String& payload);
+    void flushOutbox();
+    void startMultiResponse(MultiResponse kind);
+    void sendPendingMultiResponse();
+    bool publishNextMultiResponseLine();
+    void discardPendingMessages();
 
     // Connection to other components
     App* const app;
@@ -57,4 +85,11 @@ private:
     bool mqttConnected = false;
     CircularArray<String, ActionLogSize> actionLog;
     String startTime;
+
+    // Outbox for important messages (like ring) which is entirely published in every loop.
+    CircularArray<OutboundMessage, OutboxSize> outbox;
+
+    // Queue for multi-line reponses (e.g., log, raw data), limited per loop to avoid blocking.
+    MultiResponse pendingMultiResponse = MultiResponse::None;
+    CircularArraySequenceCounter multiResponseSeqNr;
 };

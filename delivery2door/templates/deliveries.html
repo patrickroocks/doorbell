@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block content %}
+
+<p class="ServerLogInfo">
+    One door rule per delivery: created when a delivery is first announced, moved when a later mail
+    knows the time more precisely. A delivery whose window has passed is <em>done</em> and is never
+    turned into a rule again - the rule itself is deleted by the doorbell service.
+</p>
+
+<div class="TableScroll">
+    <table class="ServerLog EventLog">
+        <thead>
+            <tr>
+                <th>Delivery</th>
+                <th>Window</th>
+                <th>State</th>
+                <th>Rule</th>
+                <th>Source</th>
+                <th>First seen</th>
+                <th>Last change</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in deliveries %}
+            <tr>
+                <td>{{ row.delivery_id }}</td>
+                <td class="RuleTimeSpan">{{ row.window }}</td>
+                <td>
+                    <span class="StateDot {% if row.active %}DotGreen{% else %}DotGrey{% endif %}"></span>
+                    {{ row.state }}
+                </td>
+                <td>{{ row.rule_id }}</td>
+                <td>{{ row.source_name }} / {{ row.crawler_name }}</td>
+                <td>{{ row.first_seen }}</td>
+                <td>{{ row.last_updated }}</td>
+            </tr>
+            {% endfor %}
+            {% if deliveries.is_empty() %}
+            <tr>
+                <td colspan="7">No delivery has been announced yet.</td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<h2>Mails looked at</h2>
+
+<p class="ServerLogInfo">
+    Every item is fetched and parsed exactly once, including the mail that has nothing to do with a
+    delivery - that is what keeps the traffic on the mail account down. The {{ processed_limit }} most
+    recent ones:
+</p>
+
+<div class="TableScroll">
+    <table class="ServerLog EventLog">
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>UID</th>
+                <th>Item</th>
+                <th>Delivery ids</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in processed %}
+            <tr>
+                <td>{{ row.time }}</td>
+                <td>{{ row.sequence }}</td>
+                <td>{{ row.description }}</td>
+                <td>{% if row.delivery_ids.is_empty() %}–{% else %}{{ row.delivery_ids }}{% endif %}</td>
+            </tr>
+            {% endfor %}
+            {% if processed.is_empty() %}
+            <tr>
+                <td colspan="4">Nothing has been looked at yet.</td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<h2>Re-scan a source</h2>
+
+<p class="ServerLogInfo">
+    Forgets everything about a source: its processed items, its read position and its deliveries. The
+    next poll then reads the folder again from the configured <code>lookBackDays</code> and rebuilds the
+    door rules. Existing rules in the doorbell service are left alone - they delete themselves at the
+    end of their window.
+</p>
+
+{% for source in sources %}
+<div class="FunctionLine">
+    <form action="/rescanSource" method="post"
+        onsubmit="return confirm('Really forget everything about {{ source.name }} and read it again?');">
+        <input type="hidden" name="name" value="{{ source.name }}">
+        <button class="Button">Re-scan {{ source.name }}</button>
+    </form>
+</div>
+{% endfor %}
+
+{% endblock %}

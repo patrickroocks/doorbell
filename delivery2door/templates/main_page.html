@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+
+Hi {% if let Some(user_name) = base.user_name %}{{ user_name }}{% else %}(unknown){% endif %},<br>
+welcome to the delivery2door service. It watches the configured sources for delivery announcements and
+creates a door rule in the doorbell service for the announced time span.
+
+<table class="ServerLogLegend">
+    <tbody>
+        <tr>
+            <td>Sources</td>
+            <td>{{ source_summary }}</td>
+        </tr>
+        <tr>
+            <td>Last poll</td>
+            <td>{{ base.last_poll }}</td>
+        </tr>
+        <tr>
+            <td>Next poll</td>
+            <td>{{ next_poll }}</td>
+        </tr>
+        <tr>
+            <td>Deliveries</td>
+            <td>{{ base.active_deliveries }} active, {{ done_deliveries }} done</td>
+        </tr>
+        <tr>
+            <td>Mails looked at</td>
+            <td>{{ processed_count }}</td>
+        </tr>
+        <tr>
+            <td>Doorbell service</td>
+            <td>{{ doorbell_url }}</td>
+        </tr>
+    </tbody>
+</table>
+
+{% endblock %}

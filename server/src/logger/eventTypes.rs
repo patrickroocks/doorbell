@@ -9,10 +9,17 @@ pub enum LogSource {
     System,
     User,
     Rule,
+    Api,
 }
 
 impl LogSource {
-    pub const ALL: [LogSource; 4] = [LogSource::Device, LogSource::System, LogSource::User, LogSource::Rule];
+    pub const ALL: [LogSource; 5] = [
+        LogSource::Device,
+        LogSource::System,
+        LogSource::User,
+        LogSource::Rule,
+        LogSource::Api,
+    ];
 
     pub fn asStr(&self) -> &'static str {
         match self {
@@ -20,6 +27,7 @@ impl LogSource {
             LogSource::System => "system",
             LogSource::User => "user",
             LogSource::Rule => "rule",
+            LogSource::Api => "api",
         }
     }
 
@@ -30,6 +38,7 @@ impl LogSource {
             LogSource::System => "⚙️",
             LogSource::User => "👤",
             LogSource::Rule => "📋",
+            LogSource::Api => "🔌",
         }
     }
 
@@ -40,6 +49,7 @@ impl LogSource {
             LogSource::System => "core/connection event",
             LogSource::User => "web UI event",
             LogSource::Rule => "rule event",
+            LogSource::Api => "API event (request of another service)",
         }
     }
 }
@@ -107,6 +117,17 @@ pub enum LogEventType {
     RuleBuzz,
     #[strum(serialize = "ruleAutoAck", message = "Rule: ring acknowledged")]
     RuleAutoAck,
+    #[strum(serialize = "ruleDeleteAtEnd", message = "Rule deleted at the end of its lifetime")]
+    RuleDeleteAtEnd,
+    // ------- API events (another service, via /api) -------
+    #[strum(serialize = "apiRuleCreated", message = "API: rule created")]
+    ApiRuleCreated,
+    #[strum(serialize = "apiRuleUpdated", message = "API: rule updated")]
+    ApiRuleUpdated,
+    #[strum(serialize = "apiRuleDeleted", message = "API: rule deleted")]
+    ApiRuleDeleted,
+    #[strum(serialize = "apiAuthFailed", message = "API: authentication failed")]
+    ApiAuthFailed,
 }
 
 impl LogEventType {
@@ -132,7 +153,11 @@ impl LogEventType {
             | LogEventType::RuleAutoBuzzOn
             | LogEventType::RuleAutoBuzzOff
             | LogEventType::RuleBuzz
-            | LogEventType::RuleAutoAck => LogSource::Rule,
+            | LogEventType::RuleAutoAck
+            | LogEventType::RuleDeleteAtEnd => LogSource::Rule,
+            LogEventType::ApiRuleCreated | LogEventType::ApiRuleUpdated | LogEventType::ApiRuleDeleted | LogEventType::ApiAuthFailed => {
+                LogSource::Api
+            }
             _ => LogSource::User,
         }
     }

@@ -118,7 +118,8 @@ impl MqttAdapter {
                     client.disconnect().await.ok();
                     state.connected = false;
                 }
-                state.eventloop = None; // Drop eventloop first to stop processing
+                state.eventloop = None; // Drop eventloop first to stop processing.
+                state.mqttClient.failPendingCommand().await;
                 state.mqttClient = MqttClient::new(tx.clone(), ruleTx.clone(), appState.clone(), logTx.clone());
             }
         });

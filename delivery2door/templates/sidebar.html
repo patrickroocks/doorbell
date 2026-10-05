@@ -1,0 +1,34 @@
+{% if let Some(user_name) = base.user_name %}
+
+<div id="sidebar">
+    <div class="SidebarBox">
+        <div class="SidebarHeading">System</div>
+        <div id="system_states" class="SidebarBody SystemGrid">
+            <div class="SystemLabel">User:</div>
+            <div>{{ user_name }}</div>
+
+            <div></div>
+            <form action="/doLogout" method="post"><button class="Button">Logout</button></form>
+
+            <div class="SystemLabel" title="Deliveries waiting for their window">Active:</div>
+            <div>
+                <span class="StateDot {% if base.active_deliveries > 0 %}DotGreen{% else %}DotGrey{% endif %}"></span>
+                <span>{{ base.active_deliveries }}</span>
+            </div>
+
+            <div class="SystemLabel" title="Last completed poll of all sources">Last poll:</div>
+            <div>{{ base.last_poll }}</div>
+        </div>
+    </div>
+
+    <div class="SidebarBox">
+        <div class="SidebarHeading">Navigation</div>
+        <div id="navigation" class="SidebarBody SidebarNav">
+            <a href="/">Main Page</a>
+            <a href="/deliveries">Deliveries</a>
+            <a href="/serviceLog">Service log</a>
+        </div>
+    </div>
+</div>
+
+{% endif %}
