@@ -1,6 +1,6 @@
 # Doorbell HTTP Server
 
-This project implements a Rust web server, that makes the doorbell device (the Arduino project in `broker-arduino`, wired to the house intercom) reachable from a browser. It connects as an MQTT client to the device's broker and offers a web UI to configure and diagnose the system. 
+This project implements a Rust web server, that makes the doorbell device (the Arduino project in `device-arduino`, wired to the house intercom) reachable from a browser. It connects as an MQTT client to the MQTT broker and offers a web UI to configure and diagnose the system. 
 
 Main functionalities:
 * Toggle the Auto Buzz state via web UI

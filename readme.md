@@ -1,16 +1,17 @@
-# Doorbell broker and client
+# Doorbell services
 
-This repository contains the source code for a project to connect the doorbell (house intercom) with a PC client and a web UI.
+This repository contains the source code for a project to connect the doorbell (house intercom) with a PC client and a web UI. 
 
-A small documentation of the project is available at: https://www.p-roocks.de/doorbell
+* A small documentation of the project is available at: https://www.p-roocks.de/doorbell
+* The system sketch is given in [doc/system-sketch.md](doc/system-sketch.md).
+* In [doc/mqtt-contract.md](doc/mqtt-contract.md) the MQTT protocol between the device and its controllers is specified.
 
 It contains five projects:
-* broker-arduino
+* device-arduino
   * An Arduino project to get the ring signal from the house intercom und send the door buzzer command to the intercom.
-  * The Arduino also runs a MQTT broker to provide the ring signals.
-  * See [broker-arduino/readme.md](broker-arduino/readme.md) for the build environment and the pinned library versions.
+  * See [device-arduino/readme.md](device-arduino/readme.md) for the build environment and the pinned library versions.
 * client
-  * A Qt project to connect to the MQTT broker on the Arduino.
+  * A Qt project to connect to the Arduino device.
   * Displays a "door ring detected" popup, when a ring message is received via MQTT.
   * Offers a "open door" button to activate the door buzzer.
   * Allows to configure the connection and offers some diagnostics.
@@ -28,18 +29,11 @@ It contains five projects:
   * See [delivery2door/readme.md](delivery2door/readme.md) for details.
 * emulated-device
   * A Rust console application that emulates the Arduino device, for debugging and demonstrating the system without the real hardware.
-  * Speaks the same MQTT protocol as the device, via an external MQTT broker (e.g. Mosquitto).
+  * Supports the same MQTT protocol as the device, via an external MQTT broker (e.g. Mosquitto).
   * Keys emulate the ring signal and the three switches; commands from the server or the client are answered automatically.
   * See [emulated-device/readme.md](emulated-device/readme.md) for details.
 
-Related docs:
-* In [doc/system-sketch.md](doc/system-sketch.md) the connections of the hardware are sketched.
-* In [doc/mqtt-contract.md](doc/mqtt-contract.md) the MQTT protocol between the device and its controllers is specified.
-* In [CHANGES.md](CHANGES.md) the history of the project is documented.
-
-
 ## Checkout
-
 ```
 git clone https://github.com/patrickroocks/doorbell doorbell
 ```

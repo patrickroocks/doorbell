@@ -1,10 +1,10 @@
 # Doorbell client
 
-This is the PC client to get the bell rings and control the buzzer. The client is a Qt6 project in the sub-folder `client`. Have a look at [../readme.md](../readme.md) for an overview of the entire project (broker & client).
+This is the PC client to get the bell rings and control the buzzer. The client is a Qt6 project in the sub-folder `client`. Have a look at [../readme.md](../readme.md) for an overview of the entire project.
 
 ## Build
 
-The doorbell client needs Qt6, and we recommend Qt 6.8.3.
+The doorbell client needs Qt6, and we recommend at least Qt 6.8.3.
 
 ### Build MQTT dependency
 

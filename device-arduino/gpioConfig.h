@@ -17,6 +17,5 @@ constexpr int InputRing = 10;
 constexpr int RelayBuzzer = 11;
 constexpr int RelayExtBell = 12;
 
-// Debouncing counts main loop samples, not time - App::loop() holds MainLoopSampleTimeMs (100ms).
 constexpr int SwitchDebounceCycles = 2; // 200ms
 constexpr int InputDebounceCycles = 5;  // 500ms

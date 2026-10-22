@@ -1,7 +1,7 @@
 # Doorbell device emulator
 
 A small console application that partially emulates the ESP32 doorbell device
-(`broker-arduino/`) for debugging and demonstrating the system without the real hardware.
+(`device-arduino/`) for debugging and demonstrating the system without the real hardware.
 It speaks the MQTT protocol described in [doc/mqtt-contract.md](../doc/mqtt-contract.md). 
 The LEDs and relays are not emulated.
 

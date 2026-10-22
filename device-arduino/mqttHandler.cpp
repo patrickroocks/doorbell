@@ -4,6 +4,7 @@
 #include "arduinoSecrets.h"
 #include "networkHandler.h"
 #include "stateGpioHandler.h"
+#include "version.h"
 
 using namespace mqttBrokerName;
 
@@ -135,7 +136,7 @@ void MqttHandler::setup()
         networkHandler->setRequestLogWhenValidTime();
         ntpHint = " (NTP time not yet valid)";
     }
-    addToActionLog(String("Device started, initial autoBuzz is ") + (stateGpioHandler->getAutoBuzzState() ? "on" : "off") + ntpHint);
+    addToActionLog(String("Device started, version ") + DeviceVersion + ", initial autoBuzz is " + (stateGpioHandler->getAutoBuzzState() ? "on" : "off") + ntpHint);
 
     setupMqttClient();
 }

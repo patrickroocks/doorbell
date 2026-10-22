@@ -1,4 +1,4 @@
-# Doorbell broker (ESP32)
+# Doorbell device (ESP32)
 
 Firmware for the device: reads the intercom's ring signal, drives the door buzzer and the
 external bell relay, and speaks MQTT with its controllers. See
@@ -18,17 +18,16 @@ the WiFi and MQTT settings before building.
 
 ## Library versions
 
-These are the versions the firmware is built and tested against. **Do not let the Library Manager
-update them blindly** - see the pitfall below.
+These are the versions the firmware is built and tested against. Do not let the Library Manager update them blindly - see the pitfall below.
 
-| Library             | Version         | Used for                                        |
-| ------------------- | --------------- | ----------------------------------------------- |
-| EmbeddedMqttBroker  | **2.0.12-qos0** | the MQTT broker running on the device itself    |
-| WrapperFreeRTOS     | 1.0.2           | dependency of EmbeddedMqttBroker                |
-| Async TCP           | 3.5.0           | dependency of EmbeddedMqttBroker                |
-| ESP Async WebServer | 3.12.0          | dependency of EmbeddedMqttBroker                |
-| PubSubClient        | 2.8             | the MQTT *client* talking to the Raspi broker   |
-| NTP                 | 1.8.0           | time for the action log and the ring timestamps |
+| Library             | Version         | Used for                                                                  |
+| ------------------- | --------------- | ------------------------------------------------------------------------- |
+| EmbeddedMqttBroker  | **2.0.12-qos0** | the MQTT broker running on the device itself <br> only used as a fallback |
+| WrapperFreeRTOS     | 1.0.2           | dependency of EmbeddedMqttBroker                                          |
+| Async TCP           | 3.5.0           | dependency of EmbeddedMqttBroker                                          |
+| ESP Async WebServer | 3.12.0          | dependency of EmbeddedMqttBroker                                          |
+| PubSubClient        | 2.8             | the MQTT client talking to the Raspi broker                               |
+| NTP                 | 1.8.0           | time for the action log and the ring timestamps                           |
 
 ### Pitfall: EmbeddedMqttBroker must stay on 2.0.12
 

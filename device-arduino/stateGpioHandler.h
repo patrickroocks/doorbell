@@ -81,8 +81,6 @@ private:
     // System states
     bool ringActive = false;
     bool autoBuzz = false;
-    // A rule on the server is armed to buzz on a ring. Shown on LedRuleAutobuzz only - the server
-    // does the buzzing itself. Not persisted in the EEPROM, the server re-sends it after a connect.
     bool ruleAutoBuzz = false;
     bool wantToReboot = false;
 

@@ -20,8 +20,6 @@ struct LogEntry {
 
 pub struct Device {
     pub autoBuzz: bool,
-    // A rule on the server is armed to buzz on a ring. The real device shows this on an LED and
-    // does nothing else with it; it is not persisted, the server re-sends it after a connect.
     pub ruleAutoBuzz: bool,
     pub ringActive: bool,
     pub startTime: String,

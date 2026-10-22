@@ -4,6 +4,7 @@
 #include "networkHandler.h"
 #include "stateGpioHandler.h"
 #include "timing.h"
+#include "version.h"
 
 NetworkHandler& createNetworkHandler(App* app)
 {
@@ -49,7 +50,7 @@ void App::setup()
 
     Serial.begin(115200);
     Serial.println("");
-    Serial.println("Starting doorbell broker...");
+    Serial.println(String("Starting doorbell device, version ") + DeviceVersion + "...");
 
     // LEDs are already needed for WIFI setup (blinking!)
     stateGpioHandler->setup();
