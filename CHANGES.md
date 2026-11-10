@@ -3,6 +3,7 @@
 ### Device version 0.3.1, 2026-11-10
 
 - Reboot via three buttons tries next WiFi in list on next start
+- Reachable as `doorbell.local` (mDNS and DHCP hostname), e.g. for the local broker in a mobile hotspot
 
 ### Server version 0.3.1, 2026-11-10
 

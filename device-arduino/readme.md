@@ -22,6 +22,11 @@ On start the device tries the WiFi networks in list order, beginning with the on
 the EEPROM. The WiFi found is stored, so the next start tries it first. Pressing all three
 switches at once reboots the device and makes it start with the next WiFi in the list.
 
+The device registers the hostname `doorbell` via DHCP and mDNS, so it is reachable as
+`doorbell.local` without knowing its IP. This is meant for networks with changing IPs (e.g. a
+mobile hotspot): there the device falls back to its local broker, and clients use `doorbell.local`
+as broker address. On Windows, `.local` names resolve natively; on Linux, Avahi is needed.
+
 ## Library versions
 
 These are the versions the firmware is built and tested against. Do not let the Library Manager update them blindly - see the pitfall below.

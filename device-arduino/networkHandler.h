@@ -31,6 +31,7 @@ private:
     bool handleWifiConnection();
     uint8_t getStartWifiIndex() const;
     void setupWifiConn(const WifiConfig& wifiConfig);
+    void setupMdns();
     void setupNTP();
 
     // Connection to other components

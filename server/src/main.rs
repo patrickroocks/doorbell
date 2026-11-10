@@ -27,12 +27,23 @@ use util::notifyWithState::NotifyWithState;
 use clap::Parser;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
-use tokio::signal::unix::{SignalKind, signal};
 use tokio::sync::mpsc;
 use tracing::{error, info};
 use tracing_subscriber;
 
 const BUFF_SIZE: usize = 32;
+
+// SIGTERM (sent by systemd on the Raspi) only exists on Unix.
+#[cfg(unix)]
+async fn waitForSigterm() {
+    use tokio::signal::unix::{SignalKind, signal};
+    signal(SignalKind::terminate()).unwrap().recv().await;
+}
+
+#[cfg(not(unix))]
+async fn waitForSigterm() {
+    std::future::pending::<()>().await
+}
 
 // Call with "--help" to see these infos
 #[derive(Parser)]
@@ -141,23 +152,14 @@ async fn main() -> std::process::ExitCode {
     });
 
     // Construct MqttAdapter, get task (MQTT event loop task is created in the constructor of the adapter)
-    let mqttAdapter = MqttAdapter::new(
-        httpTx,
-        ruleTx,
-        mqttRx,
-        cfgStore.clone(),
-        cancelNotify.clone(),
-        appState,
-        logTx,
-    )
-    .await;
+    let mqttAdapter = MqttAdapter::new(httpTx, ruleTx, mqttRx, cfgStore.clone(), cancelNotify.clone(), appState, logTx).await;
     let mqttTask = mqttAdapter.eventloopTask;
 
     info!("All tasks started.");
 
     // Wait for ctrl+c, SIGTERM, or termination due to an (early) error (e.g., port bind failure, config error)
     // The tasks broadcast the termination signal via the cancellation notification, which is listened to in the main loops of the tasks.
-    let mut sigterm = signal(SignalKind::terminate()).unwrap();
+    let sigterm = waitForSigterm();
 
     // A cancellation that was not requested by a signal comes from a task that gave up (port bind
     // failure, missing MQTT configuration, ...) - that has to be reported as a failed run, so the
@@ -168,7 +170,7 @@ async fn main() -> std::process::ExitCode {
             info!("Received SIGINT, shutting down...");
             cancelNotify.signal();
         },
-        _ = sigterm.recv() => {
+        _ = sigterm => {
             info!("Received SIGTERM, shutting down...");
             cancelNotify.signal();
         },

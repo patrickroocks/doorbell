@@ -6,6 +6,11 @@
 #include "stateGpioHandler.h"
 #include "timing.h"
 
+#include <ESPmDNS.h>
+
+// Hostname for DHCP and mDNS: the device is reachable as "doorbell.local".
+constexpr const char* DeviceHostname = "doorbell";
+
 NetworkHandler::NetworkHandler(App* app)
     : app(app)
     , ntp(wifiUdp)
@@ -31,6 +36,7 @@ void NetworkHandler::setup()
     mqttHandler = app->getMqttHandler();
 
     wifiConnected = false;
+    WiFi.setHostname(DeviceHostname);
 
     const auto wifiConfigs = getWifiConfigs();
     wifiCount = static_cast<uint8_t>(wifiConfigs.size());
@@ -47,6 +53,7 @@ void NetworkHandler::setup()
     }
 
     if (wifiConnected) {
+        setupMdns();
         setupNTP();
     }
 }
@@ -114,6 +121,16 @@ void NetworkHandler::setupWifiConn(const WifiConfig& wifiConfig)
     Serial.println("WiFi '" + wifiConfig.ssid + "' connected. IP: ");
     Serial.println(WiFi.localIP());
     wifiConnected = true;
+}
+
+void NetworkHandler::setupMdns()
+{
+    // The mDNS responder re-announces itself on WiFi reconnects, so this is needed only once.
+    if (MDNS.begin(DeviceHostname)) {
+        Serial.println("mDNS responder started: " + String(DeviceHostname) + ".local");
+    } else {
+        Serial.println("mDNS responder could not be started");
+    }
 }
 
 void NetworkHandler::setupNTP()

@@ -168,57 +168,80 @@ async fn establishConnectionAndMqttClient(
 }
 
 async fn runMainEventAndMessageLoop(state: &mut MqttState) {
-    loop {
-        if let Some(eventloop) = &mut state.eventloop {
-            tokio::select! {
-                // Notification from the main function (e.g., SIGINT)
-                _ = state.cancelNotify.notified() => {
-                    info!("MqttAdapter: cancellation requested, shutting down...");
-                    break;
-                },
+    let Some(mut eventloop) = state.eventloop.take() else {
+        // This should not happen.
+        error!("MQTT event loop is not initialized");
+        state.cancelNotify.signal();
+        return;
+    };
 
-                // Incoming MQTT IntMsg
-                event = eventloop.poll() => {
-                    if !handleIncomingEvent(state, event).await {
-                        if state.cfgState.moveToNextConfig() {
-                            info!("Moving to next MQTT config");
-                        }
-                        break;
-                    }
-                },
+    // The future of eventloop.poll() must survive the other select! branches: dropping it aborts a
+    // connection attempt in progress (DNS lookup, TCP connect, CONNACK). As we tick at least every
+    // second, a slow lookup (e.g., mDNS for "doorbell.local" on Windows takes ~1.5 s) would be
+    // restarted forever and never connect. Hence the future is only recreated once it completed.
+    'outer: loop {
+        let event = {
+            let pollFuture = eventloop.poll();
+            tokio::pin!(pollFuture);
+            loop {
+                tokio::select! {
+                    // Notification from the main function (e.g., SIGINT)
+                    _ = state.cancelNotify.notified() => {
+                        info!("MqttAdapter: cancellation requested, shutting down...");
+                        break 'outer;
+                    },
 
-                // Internal message (e.g., from HTTP server)
-                Some(msg) = state.mqttRx.recv() => {
-                    state.mqttClient.handleInternalMessage(msg).await;
-                },
+                    // Incoming MQTT event
+                    event = &mut pollFuture => break event,
 
-                // MQTT client requests immediate tick, e.g., for sending a message
-                _ = state.mqttClient.needsTickImmediately() => {
-                    state.mqttClient.tick().await;
-                },
+                    // Internal message (e.g., from HTTP server)
+                    Some(msg) = state.mqttRx.recv() => {
+                        state.mqttClient.handleInternalMessage(msg).await;
+                    },
 
-                // At latest, we tick every second to keep track about timeouts
-                _ = tokio::time::sleep(Duration::from_secs(1)) => {
-                    state.mqttClient.tick().await;
-                },
+                    // MQTT client requests immediate tick, e.g., for sending a message
+                    _ = state.mqttClient.needsTickImmediately() => {
+                        state.mqttClient.tick().await;
+                    },
+
+                    // At latest, we tick every second to keep track about timeouts
+                    _ = tokio::time::sleep(Duration::from_secs(1)) => {
+                        state.mqttClient.tick().await;
+                    },
+                }
+
+                if switchToNextConfigIfDisconnectedTooLong(state) {
+                    break 'outer;
+                }
             }
+        };
 
-            // If the inner client is not connected for a while and we have multiple configs,
-            // request new connection parameters and move to the next config.
-            if state.mqttClient.requestNewConnectionParams() && state.cfgState.moveToNextConfig() {
-                info!(
-                    "MQTT connection has been disconnected for a while from {}, moving to next config.",
-                    state.cfgState.getCurrentConnInfoStr()
-                );
-                break;
+        if !handleIncomingEvent(state, event).await {
+            if state.cfgState.moveToNextConfig() {
+                info!("Moving to next MQTT config");
             }
-        } else {
-            // This should not happen.
-            error!("MQTT event loop is not initialized");
-            state.cancelNotify.signal();
+            break;
+        }
+
+        if switchToNextConfigIfDisconnectedTooLong(state) {
             break;
         }
     }
+
+    state.eventloop = Some(eventloop);
+}
+
+// If the inner client is not connected for a while and we have multiple configs,
+// request new connection parameters and move to the next config.
+fn switchToNextConfigIfDisconnectedTooLong(state: &mut MqttState) -> bool {
+    if state.mqttClient.requestNewConnectionParams() && state.cfgState.moveToNextConfig() {
+        info!(
+            "MQTT connection has been disconnected for a while from {}, moving to next config.",
+            state.cfgState.getCurrentConnInfoStr()
+        );
+        return true;
+    }
+    false
 }
 
 async fn handleIncomingEvent(state: &mut MqttState, event: Result<rumqttc::Event, rumqttc::ConnectionError>) -> bool {
