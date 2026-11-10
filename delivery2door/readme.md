@@ -231,12 +231,27 @@ the two do not span anything, since that would refuse every announcement.
 
 ### Supported carriers
 
-Both come out of the same `regexCrawler`, only the config differs:
+All of them come out of the same `regexCrawler`, only the config differs:
 
 | Crawler       | Senders                                                        | Id                               | Announcements                                                     |
 | ------------- | -------------------------------------------------------------- | -------------------------------- | ----------------------------------------------------------------- |
 | `dhl-mail`    | `@dhl.de`                                                      | `piececode=...`                  | `heute zwischen 13:45 - 15:15 Uhr ...`, `am Mittwoch, den 12.08.` |
 | `amazon-mail` | `shipment-tracking@amazon.de`, `versandbestaetigung@amazon.de` | `Bestellnr. 305-3203050-2444367` | `Zustellung heute 15:15 - 18:15`, `Ankunft morgen`                |
+| `dpd-mail`    | `@service.dpd.de`                                              | `parcelno=MPS06265016399563...`  | `heute zwischen 13:11 und 15:11 Uhr`                              |
+
+DPD sends an HTML-only mail ("Predict") on the delivery day. Its tracking links carry the parcel
+number as `parcelno=MPS<parcel number><shipping date>`; the crawler takes the 14 digit parcel number
+that the mail also shows, so `DPD 06265016399563`:
+
+```json
+"dpd-mail": {
+    "namePrefix": "DPD",
+    "deliveryIdentifier": "dpd\\.de/[^\"\\s]*parcelno=(?:MPS)?([0-9]{14})",
+    "deliveryDateToday": "zwischen {HH:MM} und {HH:MM} Uhr"
+}
+```
+
+The pattern starts at `zwischen` because DPD puts a `<span>` between `heute` and `zwischen`.
 
 Amazon sends the shipping confirmation with `Ankunft morgen` first and the `In Zustellung` mail with
 the precise window on the delivery day - the second one moves the rule that the first one created.

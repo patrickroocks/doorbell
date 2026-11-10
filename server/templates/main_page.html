@@ -2,17 +2,36 @@
 {% block content %}
 
 
-Hi {% if let Some(user_name) = base.user_name %}{{ user_name }}{% else %}(unknown){% endif %},<br>
+Hello {% if let Some(display_name) = base.display_name %}{{ display_name }}{% endif %},<br>
 welcome to the doorbell service!
 
 <div class="FunctionLine">
-    <form action="/toggleAutoBuzz" method="post">
-        <button class="Button">Toggle Device Auto Buzz</button>
-    </form>
+    <table class="DataTable">
+        <thead>
+            <tr>
+                <th>State Variable</th>
+                <th>Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Last ring</td>
+                <td>{{ last_ring_time }}</td>
+            </tr>
+            <tr>
+                <td>Rule schedule</td>
+                <td>{{ rule_schedule }}</td>
+            </tr>
+        </tbody>
+    </table>
 </div>
-<div class="FunctionLine">
+
+<div class="FunctionLine ButtonRow">
+    <form action="/toggleAutoBuzz" method="post">
+        <button class="Button ButtonInline">Toggle Device Auto Buzz</button>
+    </form>
     <form action="/buzz" method="post" onsubmit="return confirm('Do you really want to buzz the door?');">
-        <button class="Button">Door buzzer</button>
+        <button class="Button ButtonInline">Door buzzer</button>
     </form>
 </div>
 

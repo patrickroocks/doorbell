@@ -19,7 +19,9 @@ Technologies used:
 
 # Setup Rust & dependencies on PC
 
-## Setup Rust
+## Rust
+
+### Install Rust and dependencies
 
 ```
 curl https://sh.rustup.rs -sSf | sh
@@ -41,6 +43,12 @@ Updates the .toml files. Do this after a update of rust.
 ```
 cargo install cargo-edit
 cargo upgrade
+```
+
+Also update incompatible dependencies, code might have to be fixed afterwards:
+
+```
+cargo upgrade --incompatible
 ```
 
 ## Install ngrok
@@ -67,6 +75,12 @@ Run it:
 ```
 ./target/release/doorbell_http_server --config cfg/config_release.json
 ```
+
+# Config
+
+See `cfg/config_release.json.example` for an example configuration. This file has to be renamed to `cfg/config_release.json`. The list of MQTT servers is tried in order until a connection is successful. Special attributes are:
+
+* `rebootDeviceOnConnect`: If true, the device is rebooted when it connects via this broker. With this, we move the MQTT broker from the device to the Raspi.
 
 # Service state
 
@@ -120,12 +134,14 @@ is the day the last window *starts* on). It therefore requires an end date. Mean
 by another service, which nobody would clean up by hand. The deletion appears in the server log as
 "Rule deleted at the end of its lifetime".
 
-# Build and deploy for Raspberry Pi
+# Raspberry Pi deployment
+
+## Build and deploy for Raspberry Pi
 
 * Execute `prepare-raspi.sh` once
 * Build with `build-and-deploy-on-raspi.sh`
 
-# Service management on Raspberry Pi
+## Service management on Raspberry Pi
 
 sudo systemctl start doorbell.service    # Start
 sudo systemctl stop doorbell.service     # Stop

@@ -1,5 +1,15 @@
 # Changelog
 
+### Device version 0.3.1, 2026-11-10
+
+- Reboot via three buttons tries next WiFi in list on next start
+
+### Server version 0.3.1, 2026-11-10
+
+- Dashboard on start page (rule schedule, last ring)
+- Improved creation of rules (short-cut, implicit delete-at-end flag)
+- Reboot on connect only if enabled in the MQTT server config
+
 ### Server version 0.3.0, 2026-10-18
 
 - Initial published and documented version of the the server

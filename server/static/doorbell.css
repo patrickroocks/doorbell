@@ -52,6 +52,52 @@ body {
     color: #0f3c73;
 }
 
+.SidebarHeadingRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* Burger button for the navigation, only shown in the narrow layout (see media query). */
+.NavToggle {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    width: 36px;
+    height: 30px;
+    padding: 0 8px;
+    border: 1px solid #b5d2ff;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+}
+
+.NavToggle:hover {
+    background: #f2f7ff;
+}
+
+.NavToggleBar {
+    display: block;
+    height: 2px;
+    border-radius: 1px;
+    background: #0f3c73;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+/* Open state: bars turn into an "X". */
+#sidebar.NavOpen .NavToggleBar:nth-child(1) {
+    transform: translateY(6px) rotate(45deg);
+}
+
+#sidebar.NavOpen .NavToggleBar:nth-child(2) {
+    opacity: 0;
+}
+
+#sidebar.NavOpen .NavToggleBar:nth-child(3) {
+    transform: translateY(-6px) rotate(-45deg);
+}
+
 .SidebarBody {
     display: flex;
     flex-direction: column;
@@ -226,6 +272,25 @@ h1 {
         width: 100%;
     }
 
+    .NavToggle {
+        display: flex;
+    }
+
+    .SidebarHeadingRow {
+        /* Keep the heading height unchanged by the button. */
+        margin-top: -4px;
+        margin-bottom: 4px;
+    }
+
+    /* Collapsed: only the heading with the burger button remains. */
+    #sidebar:not(.NavOpen) .SidebarNav {
+        display: none;
+    }
+
+    #sidebar:not(.NavOpen) .SidebarHeadingRow {
+        margin-bottom: -4px;
+    }
+
     .SidebarNav a {
         text-align: center;
     }
@@ -236,7 +301,8 @@ h1 {
 
     .RuleTable th,
     .RuleTable td {
-        padding: 4px 6px;
+        padding-left: 6px;
+        padding-right: 6px;
     }
 }
 
@@ -247,11 +313,6 @@ h1 {
 
     .PageShell {
         padding: 12px;
-    }
-
-    .Content {
-        padding: 16px;
-        width: 100%;
     }
 
     .AuthGrid {
@@ -310,10 +371,55 @@ h1 {
     transform: translateY(1px);
 }
 
+.ButtonInline {
+    width: auto;
+    display: inline-block;
+    text-align: center;
+    text-decoration: none;
+    padding: 8px 10px;
+    font-size: 13px;
+    line-height: 1;
+}
+
+.ButtonSecondary {
+    background: #7f8c8d;
+}
+
+.ButtonSecondary:hover {
+    background: #6c797a;
+}
+
 /* Function buttons */
 
 .FunctionLine {
     padding: 6px 0px;
+    line-height: 2.2;
+}
+
+/* Row of buttons/forms side by side, wrapping when space runs out. */
+.ButtonRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.ButtonRow form {
+    margin: 0;
+}
+
+.StackedForm {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.FormRow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 /* Status styles */
@@ -365,12 +471,6 @@ h1 {
     pointer-events: none;
 }
 
-.InfoLabel {
-    color: black;
-    padding: 4px;
-    border: 1px solid #c5defa;
-}
-
 .DeviceLog {
     font-family: monospace;
     font-size: 13px;
@@ -390,7 +490,6 @@ h1 {
 
 .ServerLogLegend {
     border-collapse: collapse;
-    margin-bottom: 14px;
     color: #555;
     font-size: 12px;
 }
@@ -401,23 +500,93 @@ h1 {
     white-space: nowrap;
 }
 
-.ServerLog {
+/* Small round "?" button that opens a .HelpPopover. */
+.HelpButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    margin-left: 4px;
+    padding: 0;
+    border: 1px solid #9dc4f5;
+    border-radius: 50%;
+    background: white;
+    color: #0f3c73;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: bold;
+    line-height: 1;
+    vertical-align: middle;
+    cursor: pointer;
+}
+
+.HelpButton:hover {
+    background: #e8f3ff;
+}
+
+/* Popover (HTML popover API), shown centered in the viewport by the browser. */
+.HelpPopover {
+    max-width: calc(100vw - 32px);
+    padding: 10px 14px 12px;
+    border: 1px solid #c5defa;
+    border-radius: 10px;
+    background: white;
+    box-shadow: 0 4px 16px rgba(15, 60, 115, 0.2);
+}
+
+.HelpPopover::backdrop {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.HelpPopoverHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 6px;
+    color: #0f3c73;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.HelpPopoverClose {
+    padding: 0 4px;
+    border: none;
+    background: none;
+    color: #555;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.HelpPopoverClose:hover {
+    color: black;
+}
+
+/* Data tables, shared by the start page, the rules page and the server log. */
+
+.DataTable {
     border-collapse: collapse;
     /* Fill the available width, but grow beyond it if the content needs more
        space - the surrounding .TableScroll then scrolls horizontally. */
     width: auto;
     min-width: 100%;
     font-size: 13px;
+    /* Tight line-height so wrapped cell text stays together, also when the
+       table sits in a container with a large line-height (e.g. .FunctionLine).
+       The spacing between rows comes from the cell padding. */
+    line-height: 1.3;
 }
 
-.ServerLog th,
-.ServerLog td {
+.DataTable th,
+.DataTable td {
     text-align: left;
-    padding: 4px 10px;
+    padding: 6px 10px;
     border-bottom: 1px solid #e2ecfb;
 }
 
-.ServerLog th {
+.DataTable th {
     background: #f6f9ff;
 }
 
@@ -442,36 +611,6 @@ h1 {
     min-width: 22ch;
     /* Details may wrap, but break inside a word rather than widen endlessly. */
     overflow-wrap: anywhere;
-}
-
-/* Rules page */
-
-.ButtonInline {
-    width: auto;
-    display: inline-block;
-    text-align: center;
-    text-decoration: none;
-    padding: 8px 14px;
-}
-
-.ButtonSecondary {
-    background: #7f8c8d;
-}
-
-.ButtonSecondary:hover {
-    background: #6c797a;
-}
-
-.RuleToolbar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    align-items: center;
-    margin-bottom: 12px;
-}
-
-.RuleToolbar form {
-    margin: 0;
 }
 
 .TableScroll {
@@ -500,6 +639,8 @@ h1 {
         border-radius: 5px;
     }
 }
+
+/* Rules page */
 
 .RuleToggleCell {
     white-space: nowrap;
@@ -601,6 +742,12 @@ h1 {
     height: 18px;
 }
 
+.RuleFormCheckCell {
+    display: flex;
+    align-items: center;
+    min-height: 18px;
+}
+
 .RuleFormButtons {
     display: flex;
     gap: 10px;
@@ -608,13 +755,6 @@ h1 {
 
 .RuleDateField {
     display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.ShortcutRuleForm {
-    display: flex;
-    flex-wrap: wrap;
     align-items: center;
     gap: 6px;
 }

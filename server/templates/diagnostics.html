@@ -2,16 +2,32 @@
 {% block content %}
 
 <div class="FunctionLine">
-    Service start time: <span class="InfoLabel">{{ service_start_time }}</span>
-</div>
-<div class="FunctionLine">
-    Device start time: <span class="InfoLabel">{{ device_start_time }}</span>
-</div>
-<div class="FunctionLine">
-    Device reboot time: <span class="InfoLabel">{{ device_reboot_time }}</span>
-</div>
-<div class="FunctionLine">
-    MQTT server (from the service, not the device): <span class="InfoLabel">{{ mqtt_server }}</span>
+    <table class="DataTable">
+        <thead>
+            <tr>
+                <th>Diagnostic Variable</th>
+                <th>Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Service start time</td>
+                <td>{{ service_start_time }}</td>
+            </tr>
+            <tr>
+                <td>Device start time</td>
+                <td>{{ device_start_time }}</td>
+            </tr>
+            <tr>
+                <td>Device reboot time</td>
+                <td>{{ device_reboot_time }}</td>
+            </tr>
+            <tr>
+                <td>MQTT server (from the service, not the device)</td>
+                <td>{{ mqtt_server }} {{ mqtt_server_note }}</td>
+            </tr>
+        </tbody>
+    </table>
 </div>
 <div class="FunctionLine">
     <form action="/reboot" method="post" onsubmit="return confirm('Do you really want to reboot the device?');">

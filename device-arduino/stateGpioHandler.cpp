@@ -4,12 +4,14 @@
 #include "debouncedSwitch.h"
 #include "gpioConfig.h"
 #include "mqttHandler.h"
+#include "networkHandler.h"
 #include "timing.h"
 
 #include <EEPROM.h>
 
-constexpr int EepromSize = 1;
+constexpr int EepromSize = 2;
 constexpr int EepromAddressAutoBuzz = 0;
+constexpr int EepromAddressWifiIndex = 1;
 
 StateGpioHandler::StateGpioHandler(App* app)
     : app(app)
@@ -83,6 +85,7 @@ void StateGpioHandler::setup()
     Serial.println("Setup StateGpioHandler");
 
     mqttHandler = app->getMqttHandler();
+    networkHandler = app->getNetworkHandler();
     inputRing.setup();
 
     readEeprom();
@@ -120,11 +123,25 @@ void StateGpioHandler::readEeprom()
         return;
     }
     autoBuzz = EEPROM.read(EepromAddressAutoBuzz) == 1;
+    storedWifiIndex = EEPROM.read(EepromAddressWifiIndex);
 }
 
-void StateGpioHandler::writeEeprom()
+void StateGpioHandler::writeAutoBuzzToEeprom()
 {
     EEPROM.write(EepromAddressAutoBuzz, autoBuzz ? 1 : 0);
+    EEPROM.commit();
+}
+
+uint8_t StateGpioHandler::getStoredWifiIndex() const
+{
+    return storedWifiIndex;
+}
+
+void StateGpioHandler::storeWifiIndex(uint8_t index)
+{
+    if (storedWifiIndex == index) return;
+    storedWifiIndex = index;
+    EEPROM.write(EepromAddressWifiIndex, index);
     EEPROM.commit();
 }
 
@@ -158,7 +175,7 @@ void StateGpioHandler::setAutoBuzzState(bool newAutoBuzzState)
     if (newAutoBuzzState == autoBuzz) return;
     autoBuzz = newAutoBuzzState;
     mqttHandler->writeAutoBuzzStateToLogAndMqtt(newAutoBuzzState);
-    writeEeprom();
+    writeAutoBuzzToEeprom();
 }
 
 void StateGpioHandler::setRuleAutoBuzzState(bool newRuleAutoBuzzState)
@@ -200,8 +217,7 @@ void StateGpioHandler::ackRingAndBuzzButton()
     ackRing();
     if (!autoBuzz) {
         buzz();
-        // Announce the physical buzz-button press to the controllers (auto-buzz is covered by
-        // the ring message, server-commanded buzzes by buzzAck). See doc/mqtt-contract.md.
+        // Send the physical buzz-button press to the server for logging.
         mqttHandler->writeDeviceBuzzToMqtt();
     }
 }
@@ -237,15 +253,16 @@ void StateGpioHandler::readSwitches()
     const bool raiseAckBuzz = switchAckBuzz.checkRaise();
     const bool raiseAck = switchAck.checkRaise();
 
+    // May be the user wants to reboot?
     const bool otherPressed = switchAckBuzz.isCurrentlyPressed() || switchAck.isCurrentlyPressed();
 
     // Reboot if all 3 buttons are pressed at the same time.
-    if (switchBuzzMode.isCurrentlyPressed() && switchAckBuzz.isCurrentlyPressed() && switchAck.isCurrentlyPressed()) {
+    // The next start then tries the next WiFi in the list first.
+    if (switchBuzzMode.isCurrentlyPressed() && switchAckBuzz.isCurrentlyPressed() && switchAck.isCurrentlyPressed() && !wantToReboot) {
+        networkHandler->preferNextWifiOnNextStart();
         reboot();
     }
 
-    // No autobuzz change while another button is pressed - the user may be reaching for the
-    // reboot combination.
     if (raiseBuzzMode && !otherPressed) {
         setAutoBuzzState(!autoBuzz);
     }

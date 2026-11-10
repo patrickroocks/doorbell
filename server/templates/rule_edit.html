@@ -21,7 +21,10 @@
 
         <label for="deleteAtEnd" title="Rule deletes itself after the last window has ended. Needs an end date.">Delete at
             end:</label>
-        <input type="checkbox" id="deleteAtEnd" name="deleteAtEnd" {% if rule.delete_at_end %}checked{% endif %}>
+        <div class="RuleFormCheckCell">
+            <input type="checkbox" id="deleteAtEnd" name="deleteAtEnd" {% if rule.delete_at_end %}checked{% endif %}>
+            <span id="deleteAtEndImplicit" hidden>(implicitly true)</span>
+        </div>
 
         <label for="startDate">Start date:</label>
         <div class="RuleDateField">
@@ -109,6 +112,22 @@
             }
             updateHints();
         });
+
+        // A single shot rule is always deleted at the end, so "delete at end" is redundant then.
+        const singleShot = document.getElementById('singleShot');
+        const deleteAtEnd = document.getElementById('deleteAtEnd');
+        const deleteAtEndImplicit = document.getElementById('deleteAtEndImplicit');
+
+        function updateDeleteAtEnd() {
+            if (singleShot.checked) {
+                deleteAtEnd.checked = false;
+            }
+            deleteAtEnd.hidden = singleShot.checked;
+            deleteAtEndImplicit.hidden = !singleShot.checked;
+        }
+
+        singleShot.addEventListener('change', updateDeleteAtEnd);
+        updateDeleteAtEnd();
 
         endDate.addEventListener('change', updateHints);
         activationTime.addEventListener('change', updateHints);

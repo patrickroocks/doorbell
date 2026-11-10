@@ -131,3 +131,66 @@ impl Crawler for RegexCrawler {
             .collect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::{Duration, Local, NaiveDate, TimeZone};
+
+    /// Excerpt of a real DPD "Predict" mail, as its decoded `text/html` part reads. DPD sends no plain
+    /// text part, and the announcement has a `<span>` in the middle of the sentence.
+    const DPD_HTML: &str = r#"<td align="center" valign="top" style="font-family:Arial, sans-serif; font-size:21px; line-height:25px; color:#FFFFFF; font-weight:300;">Ihr Paket kommt heute<span class="em_mob_block"></span> zwischen 13:11 und 15:11 Uhr.</td></tr>
+<td align="left" valign="top" style="font-family:Arial, sans-serif; font-size:16px; line-height:21px; color:#414042; font-weight:300;">Gebrüder Weiss GmbH (Intern. B<br /><a href="https://my.dpd.de/redirect.aspx?action=2&parcelno=MPS0626501639956320261109&locale=de_DE&utm_source=predict&utm_medium=email&utm_campaign=pr-einr&utm_content=link-psnr" target="_blank" style="text-decoration:underline; color:#414042;"><span style="text-decoration:underline; color:#414042;">06265016399563</span></a></td>
+<a href="https://my.dpd.de/redirect.aspx?action=2&parcelno=MPS0626501639956320261109&locale=de_DE&utm_source=predict&utm_medium=email&utm_campaign=pr-ausr&utm_content=btn-live-track" target="_blank">Paket live verfolgen</a>"#;
+
+    fn localTime(year: i32, month: u32, day: u32, hour: u32, minute: u32) -> chrono::DateTime<Local> {
+        let naive = NaiveDate::from_ymd_opt(year, month, day).unwrap().and_hms_opt(hour, minute, 0).unwrap();
+        Local.from_local_datetime(&naive).earliest().unwrap()
+    }
+
+    /// The "dpd-mail" entry of the config.
+    fn dpdCrawler() -> RegexCrawler {
+        let cfg = CrawlerConfig {
+            namePrefix: Some("DPD".to_string()),
+            deliveryIdentifier: r#"dpd\.de/[^"\s]*parcelno=(?:MPS)?([0-9]{14})"#.to_string(),
+            deliveryDateToday: Some("zwischen {HH:MM} und {HH:MM} Uhr".to_string()),
+            deliveryDateRelativeDay: None,
+            deliveryDateFuture: None,
+        };
+        let rules = WindowRules {
+            tolerance: Duration::minutes(120),
+            fullDayStartHour: 8,
+            fullDayEndHour: 20,
+        };
+        RegexCrawler::new("dpd-mail", &cfg, rules).unwrap()
+    }
+
+    fn itemOf(decodedText: &str) -> CrawlItem {
+        CrawlItem {
+            itemId: "<test@service.dpd.de>".to_string(),
+            sequence: None,
+            description: "test".to_string(),
+            sentAt: localTime(2026, 11, 10, 9, 52),
+            rawText: String::new(),
+            decodedTexts: vec![decodedText.to_string()],
+        }
+    }
+
+    #[test]
+    fn dpdMailYieldsParcelNumberAndTodayWindow() {
+        let announcements = dpdCrawler().findAnnouncements(&itemOf(DPD_HTML));
+        // The same parcel is linked twice; the "MPS" prefix and the date suffix are not part of the id,
+        // which is the parcel number the mail shows.
+        assert_eq!(announcements.len(), 1);
+        assert_eq!(announcements[0].deliveryId, "06265016399563");
+        let window = announcements[0].window.as_ref().expect("window has to be found");
+        assert_eq!(window.from, localTime(2026, 11, 10, 11, 11));
+        assert_eq!(window.to, localTime(2026, 11, 10, 17, 11));
+    }
+
+    #[test]
+    fn dpdCrawlerIgnoresOtherCarriers() {
+        let dhl = r#"<a href="https://www.dhl.de/de/privatkunden/pakete-empfangen/verfolgen.html?piececode=357820075428">"#;
+        assert!(dpdCrawler().findAnnouncements(&itemOf(dhl)).is_empty());
+    }
+}

@@ -24,10 +24,12 @@ public:
     bool getWifiConnected() const;
     bool hasValidTime() const;
     void setRequestLogWhenValidTime();
+    void preferNextWifiOnNextStart();
 
 
 private:
     bool handleWifiConnection();
+    uint8_t getStartWifiIndex() const;
     void setupWifiConn(const WifiConfig& wifiConfig);
     void setupNTP();
 
@@ -41,6 +43,9 @@ private:
     NTP ntp;
     EventTimer ntpTimer;
     EventTimer wifiReconnectTimer; // one shot, no auto restart
+
+    // Number of entries in getWifiConfigs()
+    uint8_t wifiCount = 0;
 
     // System states
     bool wifiConnected = false;

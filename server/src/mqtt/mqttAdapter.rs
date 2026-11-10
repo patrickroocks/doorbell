@@ -60,7 +60,7 @@ impl MqttConfigState {
 struct MqttState {
     eventloop: Option<rumqttc::EventLoop>,
     mqttClient: MqttClient,
-    rx: mpsc::Receiver<IntMsg>,
+    mqttRx: mpsc::Receiver<IntMsg>,
     connected: bool,
     cfgState: MqttConfigState,
     cancelNotify: Arc<NotifyWithState>,
@@ -72,9 +72,9 @@ pub struct MqttAdapter {
 
 impl MqttAdapter {
     pub async fn new(
-        tx: mpsc::Sender<IntMsg>,
+        httpTx: mpsc::Sender<IntMsg>,
         ruleTx: mpsc::Sender<IntMsg>,
-        rx: mpsc::Receiver<IntMsg>,
+        mqttRx: mpsc::Receiver<IntMsg>,
         cfg: Arc<ConfigStore>,
         cancelNotify: Arc<NotifyWithState>,
         appState: MtxAppState,
@@ -83,8 +83,8 @@ impl MqttAdapter {
         let eventloopTask = tokio::spawn(async move {
             let mut state = MqttState {
                 eventloop: None,
-                mqttClient: MqttClient::new(tx.clone(), ruleTx.clone(), appState.clone(), logTx.clone()),
-                rx,
+                mqttClient: MqttClient::new(httpTx.clone(), ruleTx.clone(), appState.clone(), logTx.clone()),
+                mqttRx,
                 connected: false,
                 cfgState: MqttConfigState::new(cfg.clone()),
                 cancelNotify: cancelNotify.clone(),
@@ -101,8 +101,12 @@ impl MqttAdapter {
                     break;
                 }
                 let currentConfig = currentConfigOpt.unwrap();
-                appState.write().await.volatileState.mqttHost = Some(currentConfig.host.clone());
-                tx.send(IntMsg::StateUpdate).await.unwrap_or_default();
+                {
+                    let volatileState = &mut appState.write().await.volatileState;
+                    volatileState.mqttHost = Some(currentConfig.host.clone());
+                    volatileState.rebootDeviceOnConnect = currentConfig.rebootDeviceOnConnect;
+                }
+                httpTx.send(IntMsg::StateUpdate).await.unwrap_or_default();
 
                 // This creates the inner MQTT client/eventloop and tries to connect to the broker.
                 let client = establishConnectionAndMqttClient(&mut state, &cfg, &currentConfig).await;
@@ -120,7 +124,7 @@ impl MqttAdapter {
                 }
                 state.eventloop = None; // Drop eventloop first to stop processing.
                 state.mqttClient.failPendingCommand().await;
-                state.mqttClient = MqttClient::new(tx.clone(), ruleTx.clone(), appState.clone(), logTx.clone());
+                state.mqttClient = MqttClient::new(httpTx.clone(), ruleTx.clone(), appState.clone(), logTx.clone());
             }
         });
 
@@ -184,7 +188,7 @@ async fn runMainEventAndMessageLoop(state: &mut MqttState) {
                 },
 
                 // Internal message (e.g., from HTTP server)
-                Some(msg) = state.rx.recv() => {
+                Some(msg) = state.mqttRx.recv() => {
                     state.mqttClient.handleInternalMessage(msg).await;
                 },
 

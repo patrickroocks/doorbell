@@ -2,10 +2,12 @@
     "users": [
         {
             "username": "user1",
+            "displayName": "Realname1",
             "password": "pass1"
         },
         {
             "username": "user2",
+            "displayName": "Realname2",
             "password": "pass2"
         }
     ],
@@ -13,7 +15,8 @@
     "mqttServers": [
         {
             "host": "external.broker.example",
-            "port": 1883
+            "port": 1883,
+            "rebootDeviceOnConnect": true
         },
         {
             "host": "localhost",

@@ -46,7 +46,7 @@ Five status LEDs and three push buttons on the device enclosure:
 | `D7`  | Switch 1         | Switch auto-buzz mode                                                           | `SwitchBuzzmode`  |
 | `D8`  | Switch 2         | Acknowledge ring and buzz                                                       | `SwitchAckBuzz`   |
 | `D9`  | Switch 3         | Acknowledge ring                                                                | `SwitchAck`       |
-| –     | Switch 1 & 2 & 3 | Reboot                                                                          | –                 |
+| –     | Switch 1 & 2 & 3 | Reboot, next start tries the next WiFi in the list first                        | –                 |
 | `D10` | (wired to AM40)  | Input bell                                                                      | `InputRing`       |
 | `D11` | Relay 1          | Output buzzer                                                                   | `RelayBuzzer`     |
 | `D12` | Relay 2          | Output external bell                                                            | `RelayExtBell`    |

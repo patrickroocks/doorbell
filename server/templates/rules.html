@@ -1,13 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div class="FunctionLine RuleToolbar">
-    <a class="Button ButtonInline" href="/editRule">New rule</a>
-</div>
+<div class="FunctionLine ButtonRow">
 
-<div class="FunctionLine RuleToolbar">
-    <form action="/shortcutRule" method="post" class="ShortcutRuleForm">
-        <label for="shortcutHours">Create single shot Auto Ack for:</label>
+    <form action="/shortcutRule" method="post" class="StackedForm">
+        <div class="FormRow">
+        <label for="shortcutHours">New Rule for next </label>
         <span class="TimeInput">
             <button type="button" class="StepButton" data-hours="-1" title="One hour less">&minus;</button>
             <input type="number" id="shortcutHours" name="hours" class="AuthInput HoursInput" value="4" min="1" max="23"
@@ -15,9 +13,17 @@
             <button type="button" class="StepButton" data-hours="1" title="One hour more">+</button>
             <span>h</span>
         </span>
+        </div>
+        <div class="FormRow">
+        <label for="shortcutSingleShot">Single shot:</label><input type="checkbox" id="shortcutSingleShot" name="singleShot" checked>&nbsp;
+        <label for="shortcutAutoAck">Auto-ACK:</label><input type="checkbox" id="shortcutAutoAck" name="autoAck" checked>
+        </div>
+        <div class="FormRow">
         <button class="Button ButtonInline" type="submit">Create</button>
+        </div>
     </form>
 </div>
+
 
 <script>
     (() => {
@@ -25,7 +31,7 @@
         const minHours = Number(hours.min);
         const maxHours = Number(hours.max);
 
-        for (const button of document.querySelectorAll('.ShortcutRuleForm .StepButton')) {
+        for (const button of document.querySelectorAll('.StackedForm .StepButton')) {
             button.addEventListener('click', () => {
                 const current = Number(hours.value);
                 const base = hours.value !== '' && Number.isFinite(current) ? current : minHours;
@@ -50,7 +56,7 @@
 <p class="SmallInfoText">No rules defined yet.</p>
 {% else %}
 <div class="TableScroll">
-    <table class="ServerLog RuleTable">
+    <table class="DataTable RuleTable">
         <tr>
             <th></th>
             <th>Name</th>
@@ -103,5 +109,9 @@
     </table>
 </div>
 {% endif %}
+
+<div class="FunctionLine ButtonRow">
+    <a class="Button ButtonInline" href="/editRule">New rule...</a>
+</div>
 
 {% endblock %}

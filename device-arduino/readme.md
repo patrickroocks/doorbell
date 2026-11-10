@@ -16,6 +16,12 @@ external bell relay, and speaks MQTT with its controllers. See
 Copy [arduinoSecrets.cpp.example](arduinoSecrets.cpp.example) to `arduinoSecrets.cpp` and fill in
 the WiFi and MQTT settings before building.
 
+## WiFi connectivity
+
+On start the device tries the WiFi networks in list order, beginning with the one stored in
+the EEPROM. The WiFi found is stored, so the next start tries it first. Pressing all three
+switches at once reboots the device and makes it start with the next WiFi in the list.
+
 ## Library versions
 
 These are the versions the firmware is built and tested against. Do not let the Library Manager update them blindly - see the pitfall below.

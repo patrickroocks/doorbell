@@ -14,10 +14,8 @@ secretConfig.rs
 .github/
 .claude/
 
-# Debug stuff / private documentation
-/debug/*
+# private documentation
 /project-doc/
-dev_scripts
 
 # Server artifacts / runtime state
 /server/target/

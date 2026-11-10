@@ -90,14 +90,13 @@ async fn main() -> std::process::ExitCode {
         })
     };
 
-    // Connection between HTTP and MQTT
-    let (txHttpToMqtt, rxHttpToMqtt) = mpsc::channel::<IntMsg>(BUFF_SIZE);
-    let (txMqttToHttp, rxMqttToHttp) = mpsc::channel::<IntMsg>(BUFF_SIZE);
-    // Ring events from MQTT to the RuleService.
-    let (txMqttToRule, rxMqttToRule) = mpsc::channel::<IntMsg>(BUFF_SIZE);
+    // Multiple Producer, Single Consumer pattern for all services
+    let (mqttTx, mqttRx) = mpsc::channel::<IntMsg>(BUFF_SIZE);
+    let (httpTx, httpRx) = mpsc::channel::<IntMsg>(BUFF_SIZE);
+    let (ruleTx, ruleRx) = mpsc::channel::<IntMsg>(BUFF_SIZE);
+    let (logTx, logRx) = mpsc::channel::<LogEvent>(BUFF_SIZE);
 
     // Logger service: HTTP and MQTT producers send events, the service writes them to SQLite.
-    let (logTx, logRx) = mpsc::channel::<LogEvent>(BUFF_SIZE);
     let mut logger = LoggerService::new(logRx, cfgStore.logRetentionDays, cancelNotify.clone());
     let logQuery = logger.queryService();
     let loggerTask = tokio::spawn(async move {
@@ -105,15 +104,15 @@ async fn main() -> std::process::ExitCode {
     });
 
     // Rule service: owns the rules SQLite DB and reacts to rings while a rule is active. It sends device
-    // commands over the same channel the HTTP server uses (txHttpToMqtt), reports its own auto-buzz state
-    // to the web UI (txMqttToHttp), and the HTTP server shares its rule store for the web UI.
+    // commands over the same channel the HTTP server uses (mqttTx), reports its own auto-buzz state
+    // to the web UI (httpTx), and the HTTP server shares its rule store for the web UI.
     // `rulesChanged` lets the HTTP layer tell the service to re-evaluate after a rule is
     // created/edited/deleted.
     let rulesChanged: RulesChangedFlag = Arc::new(AtomicBool::new(false));
     let mut ruleService = RuleService::new(
-        rxMqttToRule,
-        txHttpToMqtt.clone(),
-        txMqttToHttp.clone(),
+        ruleRx,
+        mqttTx.clone(),
+        httpTx.clone(),
         logTx.clone(),
         rulesChanged.clone(),
         cancelNotify.clone(),
@@ -126,8 +125,8 @@ async fn main() -> std::process::ExitCode {
 
     // Construct HttpServer, spwan task
     let mut http = HttpServer::new(
-        txHttpToMqtt,
-        rxMqttToHttp,
+        mqttTx,
+        httpRx,
         cfgStore.clone(),
         cancelNotify.clone(),
         appState.clone(),
@@ -143,9 +142,9 @@ async fn main() -> std::process::ExitCode {
 
     // Construct MqttAdapter, get task (MQTT event loop task is created in the constructor of the adapter)
     let mqttAdapter = MqttAdapter::new(
-        txMqttToHttp,
-        txMqttToRule,
-        rxHttpToMqtt,
+        httpTx,
+        ruleTx,
+        mqttRx,
         cfgStore.clone(),
         cancelNotify.clone(),
         appState,

@@ -32,11 +32,16 @@ void NetworkHandler::setup()
 
     wifiConnected = false;
 
-    auto wifiConfigs = getWifiConfigs();
+    const auto wifiConfigs = getWifiConfigs();
+    wifiCount = static_cast<uint8_t>(wifiConfigs.size());
 
-    for (const auto& wifiConfig : wifiConfigs) {
-        setupWifiConn(wifiConfig);
+    const uint8_t startIndex = getStartWifiIndex();
+    for (uint8_t i = 0; i < wifiCount; ++i) {
+        const uint8_t index = (startIndex + i) % wifiCount;
+        setupWifiConn(wifiConfigs[index]);
         if (wifiConnected) {
+            // Try this WiFi for the next start first.
+            stateGpioHandler->storeWifiIndex(index);
             break;
         }
     }
@@ -86,7 +91,7 @@ bool NetworkHandler::handleWifiConnection()
     }
 
     if (wifiReconnectTimer.checkEvent()) {
-        // Fail over to next WiFI config.
+        // Reboot: setup() tries all WiFi configs again, starting with the stored one.
         Serial.println("WiFi reconnect failed, reboot...");
         stateGpioHandler->reboot();
     }
@@ -118,6 +123,20 @@ void NetworkHandler::setupNTP()
     ntp.ruleSTD("CET", Last, Sun, Oct, 3, 60);
     ntp.begin();
     validTime = ntp.year() != 1970;
+}
+
+uint8_t NetworkHandler::getStartWifiIndex() const
+{
+    const uint8_t index = stateGpioHandler->getStoredWifiIndex();
+    return index < wifiCount ? index : 0;
+}
+
+void NetworkHandler::preferNextWifiOnNextStart()
+{
+    if (wifiCount == 0) return;
+    const uint8_t nextIndex = (getStartWifiIndex() + 1) % wifiCount;
+    stateGpioHandler->storeWifiIndex(nextIndex);
+    Serial.println("Next start tries WiFi '" + getWifiConfigs()[nextIndex].ssid + "' first");
 }
 
 bool NetworkHandler::getWifiConnected() const

@@ -1,3 +1,4 @@
+use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::{fmt, sync::LazyLock};
@@ -128,12 +129,37 @@ impl ToStateInfo for AutoBuzzState {
     }
 }
 
+// What the auto-buzz rules are doing now or will do next. Computed by the RuleService on a rule
+// change or a rule transition only, not on every page load.
+#[derive(PartialEq, Clone, Debug)]
+pub enum RuleSchedule {
+    NoRules,
+    ActiveUntil { ruleName: String, deactivation: DateTime<Local> },
+    NextActivation { ruleName: String, activation: DateTime<Local> },
+}
+
+impl fmt::Display for RuleSchedule {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        const FORMAT: &str = "%Y-%m-%d %H:%M";
+        match self {
+            RuleSchedule::NoRules => write!(f, "No current/planned rules"),
+            RuleSchedule::ActiveUntil { ruleName, deactivation } => {
+                write!(f, "Current rule \"{}\" active until {}", ruleName, deactivation.format(FORMAT))
+            }
+            RuleSchedule::NextActivation { ruleName, activation } => {
+                write!(f, "Next rule \"{}\" will be activated at {}", ruleName, activation.format(FORMAT))
+            }
+        }
+    }
+}
+
 // ------------- Internal message between services -------------
 
 #[derive(Debug)]
 pub enum IntMsg {
     SetDeviceAutoBuzz(bool),
     SetRuleAutoBuzz(bool),
+    SetRuleSchedule(RuleSchedule),
     SetConnState(ConnectionState),
     Buzz,
     AckRing,

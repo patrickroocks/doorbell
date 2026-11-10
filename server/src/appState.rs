@@ -11,6 +11,7 @@ pub struct VolatileState {
     pub deviceStartTime: Option<String>,
     pub serviceStartTime: DateTime<Utc>,
     pub mqttHost: Option<String>,
+    pub rebootDeviceOnConnect: bool,
 }
 
 impl VolatileState {
@@ -19,6 +20,7 @@ impl VolatileState {
             deviceStartTime: None,
             serviceStartTime: Utc::now(),
             mqttHost: None,
+            rebootDeviceOnConnect: false,
         }
     }
 }

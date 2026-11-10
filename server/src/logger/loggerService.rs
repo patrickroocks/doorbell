@@ -3,7 +3,7 @@ use crate::common::AppInfo;
 use crate::logger::eventTypes::{LogEvent, LogEventType};
 use crate::util::notifyWithState::NotifyWithState;
 
-use chrono::{Months, Utc};
+use chrono::{DateTime, Months, Utc};
 use rusqlite::Connection;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
@@ -180,6 +180,24 @@ pub struct LogQueryService {
 impl LogQueryService {
     pub fn new(db: LogDb) -> Self {
         Self { db }
+    }
+
+    // Time of the newest event of one of the given types, None if there is none (or on error).
+    pub fn queryLastEventTime(&self, eventTypes: &[LogEventType]) -> Option<DateTime<Utc>> {
+        if eventTypes.is_empty() {
+            return None;
+        }
+        let placeholders = (1..=eventTypes.len()).map(|i| format!("?{i}")).collect::<Vec<_>>().join(", ");
+        let sql = format!("SELECT MAX({TS_COL}) FROM {TABLE_NAME} WHERE {EVENT_TYPE_COL} IN ({placeholders})");
+        let typeIds: Vec<&str> = eventTypes.iter().map(|t| t.typeId()).collect();
+        let db = self.db.lock().unwrap();
+        match db.query_row(&sql, rusqlite::params_from_iter(typeIds), |row| row.get::<_, Option<i64>>(0)) {
+            Ok(ts) => ts.and_then(|ts| DateTime::from_timestamp(ts, 0)),
+            Err(e) => {
+                error!("Failed to query last event time from server log: {}", e);
+                None
+            }
+        }
     }
 
     // Reads events from the last `monthsBack` months, newest first.

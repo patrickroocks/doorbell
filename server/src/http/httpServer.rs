@@ -1,5 +1,5 @@
 use crate::appState::MtxAppState;
-use crate::common::{AppInfo, AutoBuzzState, ConnectionState, IntMsg, ToStateInfo, UserSettings};
+use crate::common::{AppInfo, AutoBuzzState, ConnectionState, IntMsg, RuleSchedule, ToStateInfo, UserSettings};
 use crate::configStore::ConfigStore;
 use crate::http::htmlModel::{HtmlModel, LoginForm, RuleForm, RuleIdForm, ShortcutRuleForm};
 use crate::http::httpApi;
@@ -47,6 +47,7 @@ const DUR_DEVICE_LOG_TIMEOUT: Duration = Duration::from_secs(10);
 // Everything optional, translation to "Unknown" or similar is done in the model.
 struct DiagonsticData {
     mqttServer: Option<String>,
+    mqttRebootDeviceOnConnect: bool,
     deviceStartTime: Option<String>, // delivered as string from the device
     deviceRebootTime: Option<DateTime<Utc>>,
     serviceStartTime: Option<DateTime<Utc>>,
@@ -56,6 +57,7 @@ impl DiagonsticData {
     pub fn new() -> Self {
         Self {
             mqttServer: None,
+            mqttRebootDeviceOnConnect: false,
             deviceStartTime: None,
             deviceRebootTime: None,
             serviceStartTime: None,
@@ -78,7 +80,7 @@ struct ServiceStateResponse {
 
 // Shared with `httpApi`, which serves the rule API from the same state.
 pub(crate) struct HttpState {
-    tx: mpsc::Sender<IntMsg>,
+    mqttTx: mpsc::Sender<IntMsg>,
     pub(crate) logTx: mpsc::Sender<LogEvent>,
     logQuery: LogQueryService,
     deviceAutoBuzzState: AutoBuzzState,
@@ -98,6 +100,8 @@ pub(crate) struct HttpState {
     pub(crate) rulesChanged: RulesChangedFlag,
     // Single-shot rules which have just fired and are about to be deleted by the RuleService.
     pendingRemovals: PendingRemovals,
+    // Computed by the RuleService, None until it reported for the first time.
+    ruleSchedule: Option<RuleSchedule>,
 }
 
 impl HttpState {
@@ -137,15 +141,15 @@ impl HttpState {
 
 pub struct HttpServer {
     state: Arc<Mutex<HttpState>>,
-    rx: mpsc::Receiver<IntMsg>,
+    httpRx: mpsc::Receiver<IntMsg>,
     cancelNotify: Arc<NotifyWithState>,
     appState: MtxAppState,
 }
 
 impl HttpServer {
     pub fn new(
-        tx: mpsc::Sender<IntMsg>,
-        rx: mpsc::Receiver<IntMsg>,
+        mqttTx: mpsc::Sender<IntMsg>,
+        httpRx: mpsc::Receiver<IntMsg>,
         cfg: Arc<ConfigStore>,
         cancelNotify: Arc<NotifyWithState>,
         appState: MtxAppState,
@@ -156,7 +160,7 @@ impl HttpServer {
         pendingRemovals: PendingRemovals,
     ) -> Self {
         let state = HttpState {
-            tx: tx,
+            mqttTx: mqttTx,
             logTx: logTx,
             logQuery: logQuery,
             deviceAutoBuzzState: AutoBuzzState::Unknown,
@@ -174,10 +178,11 @@ impl HttpServer {
             ruleStore: ruleStore,
             rulesChanged: rulesChanged,
             pendingRemovals: pendingRemovals,
+            ruleSchedule: None,
         };
         Self {
             state: Arc::new(Mutex::new(state)),
-            rx: rx,
+            httpRx: httpRx,
             cancelNotify: cancelNotify,
             appState: appState,
         }
@@ -187,6 +192,8 @@ impl HttpServer {
 
     pub async fn run(&mut self) {
         self.state.lock().await.diagData.serviceStartTime = Some(self.appState.read().await.volatileState.serviceStartTime);
+        // The persistent state (e.g. the last device reboot) is known before the first StateUpdate arrives.
+        self.handleInternalMessage(IntMsg::StateUpdate).await;
 
         // Everything that acts on the device or the rules, plus the state streams. The
         // `requireSession` layer rejects anonymous callers, so a route added here is protected by
@@ -276,7 +283,7 @@ impl HttpServer {
                 }
 
                 // Internal messages (e.g., from MQTT client)
-                Some(message) = self.rx.recv() => {
+                Some(message) = self.httpRx.recv() => {
                     self.handleInternalMessage(message).await;
                 }
 
@@ -304,6 +311,9 @@ impl HttpServer {
             IntMsg::SetRuleAutoBuzz(onOff) => {
                 state.setRuleAutoBuzzState(if onOff { AutoBuzzState::On } else { AutoBuzzState::Off });
             }
+            IntMsg::SetRuleSchedule(schedule) => {
+                state.ruleSchedule = Some(schedule);
+            }
             IntMsg::SetConnState(connState) => {
                 state.setConnectionState(connState);
             }
@@ -314,6 +324,7 @@ impl HttpServer {
                 let appState = self.appState.read().await;
                 let diagData = &mut state.diagData;
                 diagData.mqttServer = appState.volatileState.mqttHost.clone();
+                diagData.mqttRebootDeviceOnConnect = appState.volatileState.rebootDeviceOnConnect;
                 diagData.deviceRebootTime = appState.persistentState.getLastDeviceRebootTime();
                 diagData.deviceStartTime = appState.volatileState.deviceStartTime.clone();
             }
@@ -327,6 +338,8 @@ impl HttpServer {
         let mut htmlModel = HtmlModel::new();
         if let Some(mut session) = httpState.sessionManager.getSession(&cookies).await {
             htmlModel.setUser(Some(session.user.as_str()));
+            // Sessions are persisted, so the user may have been removed from the config meanwhile.
+            htmlModel.setDisplayName(httpState.cfg.users.get(&session.user).map(|u| u.displayName.as_str()));
             if let Some(msg) = &session.lastSuccessMessage {
                 // Delete message if displayed once
                 htmlModel.setLastSuccessMessage(msg);
@@ -340,7 +353,8 @@ impl HttpServer {
             htmlModel.setDeviceStartTime(diagData.deviceStartTime.clone());
             htmlModel.setServiceStartTime(diagData.serviceStartTime);
             htmlModel.setDeviceRebootTime(diagData.deviceRebootTime);
-            htmlModel.setMqttServer(diagData.mqttServer.clone());
+            htmlModel.setRuleSchedule(httpState.ruleSchedule.clone());
+            htmlModel.setMqttServer(diagData.mqttServer.clone(), diagData.mqttRebootDeviceOnConnect);
             htmlModel.setSelectedUpdateBehavior(session.userSettings.updateBehavior.clone());
             htmlModel.setConnectionState(httpState.connState.clone());
             htmlModel.setDeviceAutoBuzzState(httpState.deviceAutoBuzzState.clone());
@@ -362,6 +376,8 @@ impl HttpServer {
             return htmlModel.getRenderedOutput();
         }
 
+        // Always taken from the server log, so it survives restarts and needs no separate state.
+        htmlModel.setLastRingTime(state.logQuery.queryLastEventTime(&[LogEventType::Ring, LogEventType::RingAutoBuzz]));
         return htmlModel.renderMainPage();
     }
 
@@ -576,7 +592,7 @@ impl HttpServer {
     // Hands a command to the MQTT task. Failing means that task is gone (shutdown), which must not
     // take the request handler down with it.
     async fn sendToDevice(state: &HttpState, message: IntMsg) {
-        if let Err(e) = state.tx.send(message).await {
+        if let Err(e) = state.mqttTx.send(message).await {
             error!("Failed to send device command: {}", e);
         }
     }
@@ -802,7 +818,8 @@ impl HttpServer {
         Redirect::to("/rules").into_response()
     }
 
-    // Shortcut: create a single-shot, auto-ack rule active from now for the given number of hours.
+    // Shortcut: create a rule active from now for the given number of hours, with single shot
+    // and auto-ack as selected in the form.
     async fn handleShortcutRule(
         State(state): State<Arc<Mutex<HttpState>>>,
         cookies: Cookies,
@@ -820,16 +837,26 @@ impl HttpServer {
             }
         };
 
+        let singleShot = form.singleShot.is_some();
+        let autoAck = form.autoAck.is_some();
+        let description = match (singleShot, autoAck) {
+            (true, true) => "single shot auto-ack rule",
+            (true, false) => "single shot rule",
+            (false, true) => "auto-ack rule",
+            (false, false) => "rule",
+        };
+
         let now = Local::now();
         let end = now + chrono::Duration::hours(hours as i64);
         let rule = Rule {
             id: 0,
-            name: format!("single shot for {}h", hours),
+            name: format!("{} for {}h", description, hours),
             enabled: true,
-            autoAck: true,
-            singleShot: true,
-            // The rule removes itself on the first ring, so there is no lifetime to end.
-            deleteAtEnd: false,
+            autoAck,
+            singleShot,
+            // A single shot rule removes itself on the first ring. Otherwise the rule would
+            // linger after its window has passed, so let it be removed at its end.
+            deleteAtEnd: !singleShot,
             startDate: Some(now.date_naive()),
             // Both dates are the day the window *starts* on - for a window running past midnight
             // the part after midnight belongs to the window started today, see `Rule::isActiveAt`.
@@ -842,7 +869,7 @@ impl HttpServer {
             return Redirect::to("/rules").into_response();
         }
         state.rulesChanged.store(true, Ordering::Release);
-        let msg = format!("Created single shot rule for {}h", hours);
+        let msg = format!("Created {} for {}h", description, hours);
         Self::setSessionMessage(&state, &cookies, Some(&msg), None).await;
         Redirect::to("/rules").into_response()
     }

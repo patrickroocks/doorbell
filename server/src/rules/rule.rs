@@ -1,4 +1,4 @@
-use chrono::{DateTime, Local, NaiveDate, NaiveTime, TimeZone};
+use chrono::{DateTime, Local, NaiveDate, NaiveDateTime, NaiveTime, TimeDelta, TimeZone};
 
 // Date/time string formats used both in the SQLite store and the web form.
 pub const DATE_FORMAT: &str = "%Y-%m-%d";
@@ -47,6 +47,45 @@ impl Rule {
         // An ambiguous or missing local time due to a DST switch must not swallow the deletion, so
         // the earliest matching instant is used instead of unwrapping.
         Local.from_local_datetime(&deletionDate.and_time(self.deactivationTime)).earliest()
+    }
+
+    // End of the window the rule is in at the given time, or None if the rule is not active then.
+    // For a window running past midnight that is the deactivation time on the day after the window
+    // started, see `isActiveAt`.
+    pub fn currentWindowEnd(&self, now: DateTime<Local>) -> Option<DateTime<Local>> {
+        if !self.isActiveAt(now) {
+            return None;
+        }
+        let windowStartDate = self.windowStartDate(now)?;
+        let endDate = if self.activationTime <= self.deactivationTime {
+            windowStartDate
+        } else {
+            windowStartDate.succ_opt()?
+        };
+        Self::toLocal(endDate.and_time(self.deactivationTime))
+    }
+
+    // Start of the first window beginning after the given time, or None if the rule never starts a
+    // window again - disabled, zero-length window, or the end date has passed.
+    pub fn nextActivationAfter(&self, now: DateTime<Local>) -> Option<DateTime<Local>> {
+        if !self.enabled || self.activationTime == self.deactivationTime {
+            return None;
+        }
+        let today = now.date_naive();
+        let mut date = match self.startDate {
+            Some(start) if start > today => start,
+            _ => today,
+        };
+        // Today's window has already started (and is running or over), so the next one is tomorrow.
+        if date == today && now.time() >= self.activationTime {
+            date = date.succ_opt()?;
+        }
+        if let Some(end) = self.endDate
+            && date > end
+        {
+            return None;
+        }
+        Self::toLocal(date.and_time(self.activationTime))
     }
 
     // Builds a rule from the string fields of the web form or the API, applying all validation both
@@ -195,6 +234,15 @@ impl Rule {
         NaiveTime::parse_from_str(value.trim(), TIME_FORMAT).ok()
     }
 
+    // Local time of a naive date/time. An ambiguous time (DST switch back) maps to the earlier
+    // instant; a time skipped by the DST switch forward is moved behind the gap.
+    fn toLocal(naive: NaiveDateTime) -> Option<DateTime<Local>> {
+        Local
+            .from_local_datetime(&naive)
+            .earliest()
+            .or_else(|| Local.from_local_datetime(&(naive + TimeDelta::hours(1))).earliest())
+    }
+
     fn dateToStr(date: Option<NaiveDate>) -> String {
         date.map(|d| d.format(DATE_FORMAT).to_string()).unwrap_or_default()
     }
@@ -326,6 +374,53 @@ mod tests {
         let mut r = rule("10:00", "14:00", Some("2026-08-08"), None);
         r.deleteAtEnd = true;
         assert_eq!(r.deletionTimeAt(), None);
+    }
+
+    #[test]
+    fn currentWindowEndIsOnlyKnownWhileActive() {
+        let r = rule("10:00", "14:00", None, None);
+        assert_eq!(r.currentWindowEnd(at("2026-08-08 09:59")), None);
+        assert_eq!(r.currentWindowEnd(at("2026-08-08 12:00")), Some(at("2026-08-08 14:00")));
+        assert_eq!(r.currentWindowEnd(at("2026-08-08 14:00")), None);
+    }
+
+    #[test]
+    fn currentWindowEndOfWrapAroundWindowIsNextMorning() {
+        let r = rule("23:00", "03:00", None, None);
+        assert_eq!(r.currentWindowEnd(at("2026-08-08 23:30")), Some(at("2026-08-09 03:00")));
+        assert_eq!(r.currentWindowEnd(at("2026-08-09 02:00")), Some(at("2026-08-09 03:00")));
+    }
+
+    #[test]
+    fn nextActivationIsTodayOrTomorrow() {
+        let r = rule("10:00", "14:00", None, None);
+        assert_eq!(r.nextActivationAfter(at("2026-08-08 09:00")), Some(at("2026-08-08 10:00")));
+        // Running or already over today: the next window starts tomorrow.
+        assert_eq!(r.nextActivationAfter(at("2026-08-08 10:00")), Some(at("2026-08-09 10:00")));
+        assert_eq!(r.nextActivationAfter(at("2026-08-08 15:00")), Some(at("2026-08-09 10:00")));
+    }
+
+    #[test]
+    fn nextActivationRespectsTheDateRange() {
+        let r = rule("10:00", "14:00", Some("2026-08-10"), Some("2026-08-11"));
+        assert_eq!(r.nextActivationAfter(at("2026-08-08 15:00")), Some(at("2026-08-10 10:00")));
+        assert_eq!(r.nextActivationAfter(at("2026-08-10 15:00")), Some(at("2026-08-11 10:00")));
+        assert_eq!(r.nextActivationAfter(at("2026-08-11 15:00")), None);
+    }
+
+    #[test]
+    fn nextActivationOfWrapAroundWindowDuringItsSecondHalf() {
+        // Last window starts on 08-08 and runs into the morning of 08-09.
+        let r = rule("23:00", "03:00", None, Some("2026-08-08"));
+        assert_eq!(r.nextActivationAfter(at("2026-08-08 22:00")), Some(at("2026-08-08 23:00")));
+        assert_eq!(r.nextActivationAfter(at("2026-08-09 02:00")), None);
+    }
+
+    #[test]
+    fn disabledRuleIsNeverActivated() {
+        let mut r = rule("10:00", "14:00", None, None);
+        r.enabled = false;
+        assert_eq!(r.nextActivationAfter(at("2026-08-08 09:00")), None);
     }
 
     #[test]

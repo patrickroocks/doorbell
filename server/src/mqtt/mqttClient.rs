@@ -35,7 +35,7 @@ enum ResponseKind {
 // --------------------------- MQTT Client ---------------------------
 
 pub struct MqttClient {
-    tx: mpsc::Sender<IntMsg>,
+    httpTx: mpsc::Sender<IntMsg>,
     ruleTx: mpsc::Sender<IntMsg>,
     logTx: mpsc::Sender<LogEvent>,
     publishCallback: Option<Arc<dyn Fn(String, Vec<u8>) -> tokio::task::JoinHandle<()> + Send + Sync>>,
@@ -57,9 +57,9 @@ pub struct MqttClient {
 impl MqttClient {
     // ------------------------------- Interface -------------------------------
 
-    pub fn new(tx: mpsc::Sender<IntMsg>, ruleTx: mpsc::Sender<IntMsg>, appState: MtxAppState, logTx: mpsc::Sender<LogEvent>) -> Self {
+    pub fn new(httpTx: mpsc::Sender<IntMsg>, ruleTx: mpsc::Sender<IntMsg>, appState: MtxAppState, logTx: mpsc::Sender<LogEvent>) -> Self {
         Self {
-            tx,
+            httpTx,
             ruleTx,
             logTx,
             publishCallback: None,
@@ -379,7 +379,7 @@ impl MqttClient {
     }
 
     async fn sendInternal(&self, msg: IntMsg) {
-        self.tx.send(msg).await.unwrap_or_default()
+        self.httpTx.send(msg).await.unwrap_or_default()
     }
 
     async fn logEvent(&self, event: LogEvent) {
@@ -421,14 +421,15 @@ impl MqttClient {
         }
 
         // Check if we need a reboot (when the device is connected to its own MQTT broker instead of our).
-        let connectedToForeignBroker = self.appState.read().await.volatileState.mqttHost.as_ref().is_some_and(|h| h != "localhost");
-        if connectedToForeignBroker {
+        let rebootOnConnect = self.appState.read().await.volatileState.rebootDeviceOnConnect;
+        if rebootOnConnect {
             // Prevent reboot loop, if the device does not connect to us after the reboot for some reason.
             if let Some(lastRebootTime) = self.appState.read().await.persistentState.getLastDeviceRebootTime()
                 && lastRebootTime + DUR_MIN_REBOOT_INTERVAL > Utc::now()
             {
                 info!(
-                    "Connected to foreign broker, but device rebooted less than 24h ago at {}, not rebooting.",
+                    "Connected to foreign broker, but device rebooted less than {}min ago at {}, not rebooting.",
+                    (DUR_MIN_REBOOT_INTERVAL.as_secs() + 30) / 60,
                     lastRebootTime
                 );
             } else {

@@ -6,6 +6,7 @@ use tracing::error;
 #[derive(Debug, Deserialize)]
 pub struct UserInfo {
     pub username: String,
+    pub displayName: String,
     pub password: String,
 }
 
@@ -13,6 +14,8 @@ pub struct UserInfo {
 pub struct MqttServerInfo {
     pub host: String,
     pub port: u16,
+    #[serde(default)]
+    pub rebootDeviceOnConnect: bool,
 }
 
 fn defaultLogRetentionDays() -> u32 {

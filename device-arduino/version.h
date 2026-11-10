@@ -1,3 +1,3 @@
 #pragma once
 
-constexpr const char* DeviceVersion = "0.3.0";
+constexpr const char* DeviceVersion = "0.3.1";

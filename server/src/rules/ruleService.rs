@@ -1,4 +1,4 @@
-use crate::common::IntMsg;
+use crate::common::{IntMsg, RuleSchedule};
 use crate::logger::eventTypes::{LogEvent, LogEventType};
 use crate::rules::{rule::Rule, ruleStore::RuleStore};
 use crate::util::notifyWithState::NotifyWithState;
@@ -61,7 +61,7 @@ impl PendingRemovals {
 
 pub struct RuleService {
     store: RuleStore,
-    rxMqtt: mpsc::Receiver<IntMsg>, // ring events from the device
+    ruleRx: mpsc::Receiver<IntMsg>, // ring events from the device
     mqttTx: mpsc::Sender<IntMsg>,   // commands to the device (Buzz/AckRing, rule auto-buzz state)
     httpTx: mpsc::Sender<IntMsg>,   // rule-based auto-buzz state for the web UI
     logTx: mpsc::Sender<LogEvent>,
@@ -74,11 +74,13 @@ pub struct RuleService {
     pendingRemoval: PendingRemovals,
     // Minute in which `evaluateTransitions` last ran.
     lastEvaluateMinute: i64,
+    // Last schedule reported to the web UI, None before the first report.
+    schedule: Option<RuleSchedule>,
 }
 
 impl RuleService {
     pub fn new(
-        rxMqtt: mpsc::Receiver<IntMsg>,
+        ruleRx: mpsc::Receiver<IntMsg>,
         mqttTx: mpsc::Sender<IntMsg>,
         httpTx: mpsc::Sender<IntMsg>,
         logTx: mpsc::Sender<LogEvent>,
@@ -87,7 +89,7 @@ impl RuleService {
     ) -> Self {
         RuleService {
             store: RuleStore::new(),
-            rxMqtt,
+            ruleRx,
             mqttTx,
             httpTx,
             logTx,
@@ -97,6 +99,7 @@ impl RuleService {
             pendingRemoval: PendingRemovals::new(),
             // Set properly by the initial evaluation at the start of `run`.
             lastEvaluateMinute: 0,
+            schedule: None,
         }
     }
 
@@ -111,8 +114,9 @@ impl RuleService {
     }
 
     pub async fn run(&mut self) {
-        // Evaluate once at startup so a rule that is already within its window takes effect.
-        self.evaluateTransitions().await;
+        // Evaluate once at startup so a rule that is already within its window takes effect. Treated
+        // like a rule change, so the initial schedule is computed and reported as well.
+        self.evaluateTransitions(true).await;
         // `evaluateTransitions` only reports state changes, so the initial state has to be reported
         // explicitly - the web UI also needs to know that no rule is active.
         self.sendRuleAutoBuzzState(!self.activated.is_empty()).await;
@@ -129,7 +133,7 @@ impl RuleService {
                 _ = tickTimer.tick() => {
                     self.checkForEvaluate().await;
                 }
-                Some(msg) = self.rxMqtt.recv() => {
+                Some(msg) = self.ruleRx.recv() => {
                     if let IntMsg::RingOccurred(autoBuzz) = msg {
                         self.handleRing(autoBuzz).await;
                     }
@@ -140,7 +144,7 @@ impl RuleService {
 
     // Runs on every tick and evaluates the rules only if something can actually have happened:
     // a rule was changed in the web UI, a single-shot removal has come due, or the clock moved on
-    // to a new minute. Otherwise there is nothing to do.
+    // to a new minute.
     async fn checkForEvaluate(&mut self) {
         let now = Local::now();
         // All three are evaluated (no short-circuit), so the changed-flag is always consumed.
@@ -149,11 +153,12 @@ impl RuleService {
         let newMinute = Self::minuteIndex(now) != self.lastEvaluateMinute;
 
         if rulesChanged || removalDue || newMinute {
-            self.evaluateTransitions().await;
+            self.evaluateTransitions(rulesChanged).await;
         }
     }
 
-    async fn evaluateTransitions(&mut self) {
+    // `rulesChanged`: the rules were changed in the web UI or the API since the last evaluation.
+    async fn evaluateTransitions(&mut self, rulesChanged: bool) {
         let now = Local::now();
         self.lastEvaluateMinute = Self::minuteIndex(now);
 
@@ -170,6 +175,9 @@ impl RuleService {
         // Rules that delete themselves at the end of their last window.
         let deletedAtEndIds = self.handleDeleteAtEndRemovals(now).await;
 
+        // Whether a rule became active or inactive or was removed.
+        let mut transition = !autoRemovedIds.is_empty() || !deletedAtEndIds.is_empty();
+
         let autoBuzzWasActiveByRule = !self.activated.is_empty();
 
         // Check the stored rules for active rules.
@@ -181,9 +189,11 @@ impl RuleService {
                 // Refresh the stored rule state.
                 self.activated.insert(rule.id, rule.clone());
                 if !wasActive {
+                    transition = true;
                     self.logForRule(LogEventType::RuleActivate, rule).await;
                 }
             } else if wasActive {
+                transition = true;
                 self.activated.remove(&rule.id);
                 self.logForRule(LogEventType::RuleDeactivate, rule).await;
             }
@@ -192,6 +202,7 @@ impl RuleService {
         // Get all rules which have to be deactivated because they were deleted from the store.
         let allStoredRuleIds: HashSet<i64> = rules.iter().map(|r| r.id).collect();
         let deletedRules: Vec<Rule> = self.activated.extract_if(|id, _| !allStoredRuleIds.contains(id)).map(|(_, rule)| rule).collect();
+        transition |= !deletedRules.is_empty();
         for rule in &deletedRules {
             // A rule deleted at the end of its lifetime was already reported as RuleDeleteAtEnd,
             // which implies its deactivation - no second line for the same event.
@@ -215,6 +226,41 @@ impl RuleService {
             } else {
                 self.logEvent(LogEventType::RuleAutoBuzzOff, "").await;
             }
+        }
+
+        if rulesChanged || transition {
+            self.updateSchedule(&rules, now).await;
+        }
+    }
+
+    // Computes what the rules do now or next and reports it to the web UI if it changed.
+    async fn updateSchedule(&mut self, rules: &[Rule], now: DateTime<Local>) {
+        let schedule = Self::computeSchedule(rules, now);
+        if self.schedule.as_ref() == Some(&schedule) {
+            return;
+        }
+        self.schedule = Some(schedule.clone());
+        if let Err(e) = self.httpTx.send(IntMsg::SetRuleSchedule(schedule)).await {
+            error!("RuleService: failed to report the rule schedule: {}", e);
+        }
+    }
+
+    // Calculate current or next scheduled rule for the start page.
+    fn computeSchedule(rules: &[Rule], now: DateTime<Local>) -> RuleSchedule {
+        let current = rules.iter().filter_map(|rule| rule.currentWindowEnd(now).map(|end| (end, rule))).max_by_key(|(end, _)| *end);
+        if let Some((deactivation, rule)) = current {
+            return RuleSchedule::ActiveUntil {
+                ruleName: rule.name.clone(),
+                deactivation,
+            };
+        }
+        let next = rules.iter().filter_map(|rule| rule.nextActivationAfter(now).map(|start| (start, rule))).min_by_key(|(start, _)| *start);
+        match next {
+            Some((activation, rule)) => RuleSchedule::NextActivation {
+                ruleName: rule.name.clone(),
+                activation,
+            },
+            None => RuleSchedule::NoRules,
         }
     }
 

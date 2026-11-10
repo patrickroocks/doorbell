@@ -1,6 +1,7 @@
 use crate::common::AppInfo;
 use crate::common::AutoBuzzState;
 use crate::common::ConnectionState;
+use crate::common::RuleSchedule;
 use crate::common::ToStateInfo;
 use crate::common::UpdateBehavior;
 use crate::logger::eventTypes::LogEvent;
@@ -25,6 +26,7 @@ struct BaseTemplateFields {
     current_year: u32,
     page_title: String,
     user_name: Option<String>,
+    display_name: Option<String>,
     sse_disabled: bool,
     device_auto_buzz_state: AutoBuzzState, // auto-buzz state of the device
     rule_auto_buzz_state: AutoBuzzState,   // auto-buzz by an active rule
@@ -56,6 +58,8 @@ pub struct LoginForm {
 #[template(path = "main_page.html")]
 struct MainPageModel<'a> {
     base: &'a BaseTemplateFields,
+    last_ring_time: String,
+    rule_schedule: String,
 }
 
 #[derive(Template)]
@@ -105,6 +109,7 @@ struct DiagnosticsModel<'a> {
     device_reboot_time: String,
     service_start_time: String,
     mqtt_server: String,
+    mqtt_server_note: String,
 }
 
 // One row of the rules table, pre-formatted for display.
@@ -182,11 +187,14 @@ pub struct RuleIdForm {
     pub id: String,
 }
 
-// Result from the "single shot auto ack for N hours" shortcut form on the rules page.
+// Result from the "new rule for the next N hours" shortcut form on the rules page.
+// Unchecked checkboxes are absent from the body, hence Option.
 #[derive(Deserialize)]
 pub struct ShortcutRuleForm {
     #[serde(default)]
     pub hours: String,
+    pub singleShot: Option<String>,
+    pub autoAck: Option<String>,
 }
 
 pub struct HtmlModel {
@@ -196,7 +204,10 @@ pub struct HtmlModel {
     deviceStartTime: Option<String>, // delivered as string from the device
     deviceRebootTime: Option<DateTime<Utc>>,
     serviceStartTime: Option<DateTime<Utc>>,
+    lastRingTime: Option<DateTime<Utc>>,
+    ruleSchedule: Option<RuleSchedule>,
     mqttServer: Option<String>,
+    mqttRebootDeviceOnConnect: bool,
 }
 
 impl HtmlModel {
@@ -209,6 +220,7 @@ impl HtmlModel {
                 current_year: chrono::Local::now().year() as u32,
                 page_title: "".to_string(),
                 user_name: None,
+                display_name: None,
                 sse_disabled: false,
                 device_auto_buzz_state: AutoBuzzState::Unknown,
                 rule_auto_buzz_state: AutoBuzzState::Unknown,
@@ -221,7 +233,10 @@ impl HtmlModel {
             deviceRebootTime: None,
             deviceStartTime: None,
             serviceStartTime: None,
+            lastRingTime: None,
+            ruleSchedule: None,
             mqttServer: None,
+            mqttRebootDeviceOnConnect: false,
         }
     }
 
@@ -234,6 +249,10 @@ impl HtmlModel {
             let model = NotLoggedInModel { base: &self.baseFields };
             self.renderedOutput = Some(model.render().unwrap_or_default());
         }
+    }
+
+    pub fn setDisplayName(&mut self, displayName: Option<&str>) {
+        self.baseFields.display_name = displayName.map(|s| s.to_string());
     }
 
     pub fn setDeviceAutoBuzzState(&mut self, state: AutoBuzzState) {
@@ -272,8 +291,17 @@ impl HtmlModel {
         self.deviceRebootTime = rebootTime;
     }
 
-    pub fn setMqttServer(&mut self, mqttServer: Option<String>) {
+    pub fn setLastRingTime(&mut self, ringTime: Option<DateTime<Utc>>) {
+        self.lastRingTime = ringTime;
+    }
+
+    pub fn setRuleSchedule(&mut self, schedule: Option<RuleSchedule>) {
+        self.ruleSchedule = schedule;
+    }
+
+    pub fn setMqttServer(&mut self, mqttServer: Option<String>, rebootDeviceOnConnect: bool) {
         self.mqttServer = mqttServer;
+        self.mqttRebootDeviceOnConnect = rebootDeviceOnConnect;
     }
 
     // ---------------------------- Internal Setters for model data ----------------------------
@@ -294,7 +322,11 @@ impl HtmlModel {
     pub fn renderMainPage(&mut self) -> axum::response::Html<String> {
         self.updateFlags();
         self.setPageTitle("Main Page");
-        let model = MainPageModel { base: &self.baseFields };
+        let model = MainPageModel {
+            base: &self.baseFields,
+            last_ring_time: formatLocal(self.lastRingTime),
+            rule_schedule: self.ruleSchedule.as_ref().map_or("Rule state unknown".to_string(), |s| s.to_string()),
+        };
         self.renderedOutput = Some(model.render().unwrap_or_default());
         return self.getRenderedOutput();
     }
@@ -308,6 +340,11 @@ impl HtmlModel {
             device_reboot_time: formatLocal(self.deviceRebootTime),
             service_start_time: formatLocal(self.serviceStartTime),
             mqtt_server: self.mqttServer.clone().unwrap_or("Unknown".to_string()),
+            mqtt_server_note: match (&self.mqttServer, self.mqttRebootDeviceOnConnect) {
+                (None, _) => String::new(),
+                (Some(_), true) => "(we will try to reboot)".to_string(),
+                (Some(_), false) => "(stable)".to_string(),
+            },
         };
         self.renderedOutput = Some(model.render().unwrap_or_default());
         return self.getRenderedOutput();

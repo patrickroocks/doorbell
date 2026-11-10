@@ -9,7 +9,7 @@
             <div>{{ user_name }}</div>
 
             <div></div>
-            <form action="/doLogout" method="post"><button class="Button">Logout</button></form>
+            <form action="/doLogout" method="post"><button class="Button ButtonInline">Logout</button></form>
 
             <div class="SystemLabel">Connection:</div>
             <div>
@@ -35,7 +35,15 @@
     </div>
 
     <div class="SidebarBox">
-        <div class="SidebarHeading">Navigation</div>
+        <div class="SidebarHeading SidebarHeadingRow">
+            <span>Navigation</span>
+            <button type="button" id="nav_toggle" class="NavToggle" aria-label="Toggle navigation"
+                aria-controls="navigation" aria-expanded="false">
+                <span class="NavToggleBar"></span>
+                <span class="NavToggleBar"></span>
+                <span class="NavToggleBar"></span>
+            </button>
+        </div>
         <div id="navigation" class="SidebarBody SidebarNav">
             <a href="/">Main Page</a>
             <a href="/rules">Rules</a>
@@ -50,6 +58,13 @@
 
 <script>
     // JavaScript code after the sidebar HTML to ensure the elements are already present in the DOM.
+    // Burger button: only visible in the narrow layout, where the navigation links are collapsed by default.
+    document.getElementById('nav_toggle').addEventListener('click', () => {
+        const sidebar = document.getElementById('sidebar');
+        const isOpen = sidebar.classList.toggle('NavOpen');
+        document.getElementById('nav_toggle').setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    });
+
     const sseDisabled = "{{ base.sse_disabled | json  }}" === "true";
 
     function updateElement(htmlElementIdPrefix, jsonString) {

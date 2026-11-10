@@ -26,6 +26,10 @@ public:
     String getCurrentRawDataStr() const;
     bool getAutoBuzzState() const;
 
+    // Persisted WiFi preference
+    uint8_t getStoredWifiIndex() const;
+    void storeWifiIndex(uint8_t index);
+
     // Events
     void ring(bool testRing);
     void buzz();
@@ -41,7 +45,7 @@ private:
     // Setup / EEPROM
     void setupPins();
     void readEeprom();
-    void writeEeprom();
+    void writeAutoBuzzToEeprom();
 
     // Loop functions
     void updateBlinkState();
@@ -63,6 +67,7 @@ private:
     // Connection to other components
     App* const app;
     MqttHandler* mqttHandler = nullptr;
+    NetworkHandler* networkHandler = nullptr;
 
     // GPIO inputs
     DebouncedSwitch switchBuzzMode;
@@ -83,6 +88,7 @@ private:
     bool autoBuzz = false;
     bool ruleAutoBuzz = false;
     bool wantToReboot = false;
+    uint8_t storedWifiIndex = 0; // mirror of the EEPROM value
 
     // LED state
     uint8_t blinkState = 0;
